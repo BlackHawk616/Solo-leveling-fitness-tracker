@@ -1,24 +1,44 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
+import { initializeApp } from "@firebase/app";
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from "@firebase/auth";
+import { getFirestore } from "@firebase/firestore";
+import { getAnalytics } from "@firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDEkXTy5zHU620bU-xdu27h-UQ2CCzLTfU",
+  apiKey: "AIzaSyDEkXTy5zHU620bU-xdu27h-UQ2CCzLTfU",
   authDomain: "fitness-leveling01.firebaseapp.com",
   projectId: "fitness-leveling01",
   storageBucket: "fitness-leveling01.appspot.com",
   messagingSenderId: "475932739073",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:475932739073:web:9383f46747c68c14d06200",
+  appId: "1:475932739073:web:9383f46747c68c14d06200",
   measurementId: "G-7BB0H8VKKS"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const analytics = getAnalytics(app);
-export const googleProvider = new GoogleAuthProvider();
+let auth;
+let db;
+let analytics;
+let googleProvider;
+
+try {
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  analytics = getAnalytics(app);
+  googleProvider = new GoogleAuthProvider();
+
+  // Enable persistence
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log('Firebase persistence enabled');
+    })
+    .catch((error) => {
+      console.error('Firebase persistence error:', error);
+    });
+
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+}
 
 // Helper function to format user data for Firestore
 export interface UserData {
@@ -37,3 +57,5 @@ export interface WorkoutData {
   startedAt: Date;
   endedAt: Date;
 }
+
+export { auth, db, analytics, googleProvider };

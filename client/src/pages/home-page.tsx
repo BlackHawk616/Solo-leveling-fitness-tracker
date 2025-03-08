@@ -53,19 +53,29 @@ export default function HomePage() {
     queryFn: async () => {
       if (!firebaseUser) return [];
 
-      const workoutsRef = collection(db, "workouts");
-      const q = query(
-        workoutsRef,
-        where("userId", "==", firebaseUser.uid),
-        orderBy("startedAt", "desc"),
-        limit(10)
-      );
+      try {
+        const workoutsRef = collection(db, "workouts");
+        const q = query(
+          workoutsRef,
+          where("userId", "==", firebaseUser.uid),
+          orderBy("startedAt", "desc"),
+          limit(10)
+        );
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WorkoutData[];
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as WorkoutData[];
+      } catch (error) {
+        console.error('Error fetching workouts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch workouts",
+          variant: "destructive"
+        });
+        return [];
+      }
     },
     enabled: !!firebaseUser
   });
@@ -74,28 +84,34 @@ export default function HomePage() {
     mutationFn: async (data: { name: string, durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
 
-      const workout: WorkoutData = {
-        userId: firebaseUser.uid,
-        name: data.name,
-        durationSeconds: data.durationSeconds,
-        startedAt: startTimeRef.current || new Date(),
-        endedAt: new Date()
-      };
+      try {
+        const workout: WorkoutData = {
+          userId: firebaseUser.uid,
+          name: data.name,
+          durationSeconds: data.durationSeconds,
+          startedAt: startTimeRef.current || new Date(),
+          endedAt: new Date()
+        };
 
-      // Add workout to Firestore
-      const workoutRef = await addDoc(collection(db, "workouts"), workout);
+        // Add workout to Firestore
+        const workoutRef = await addDoc(collection(db, "workouts"), workout);
+        console.log('Workout saved:', workoutRef.id);
 
-      // Update user stats
-      const userRef = doc(db, "users", firebaseUser.uid);
-      const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
+        // Update user stats
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
 
-      await updateDoc(userRef, {
-        exp: user.exp + expGained,
-        totalWorkoutSeconds: user.totalWorkoutSeconds + data.durationSeconds,
-        level: calculateNewLevel(user.exp + expGained)
-      });
+        await updateDoc(userRef, {
+          exp: user.exp + expGained,
+          totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + data.durationSeconds,
+          level: calculateNewLevel(user.exp + expGained)
+        });
 
-      return { workout, expGained };
+        return { workout, expGained };
+      } catch (error) {
+        console.error('Error saving workout:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       refetchWorkouts();

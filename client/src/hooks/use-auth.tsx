@@ -45,20 +45,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.email);
       setFirebaseUser(firebaseUser);
       setIsLoading(true);
 
-      if (firebaseUser) {
-        // Get user data from Firestore
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as UserData);
+      try {
+        if (firebaseUser) {
+          // Get user data from Firestore
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            console.log('User data found:', userDoc.data());
+            setUser(userDoc.data() as UserData);
+          } else {
+            console.log('No user data found');
+            setUser(null);
+          }
+        } else {
+          console.log('No firebase user');
+          setUser(null);
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setError(error as Error);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -106,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
+      console.log('Attempting login:', data.email);
       const { user: firebaseUser } = await signInWithEmailAndPassword(
         auth,
         data.email,
@@ -127,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
