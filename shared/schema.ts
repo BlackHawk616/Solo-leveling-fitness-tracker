@@ -25,18 +25,26 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true
 });
 
-export const insertWorkoutSchema = createInsertSchema(workouts).pick({
-  name: true,
-  durationSeconds: true,
-  startedAt: true,
-  endedAt: true
-});
+// Update the workout schema to handle dates correctly
+export const insertWorkoutSchema = createInsertSchema(workouts)
+  .pick({
+    name: true,
+    durationSeconds: true,
+    startedAt: true,
+    endedAt: true
+  })
+  .transform((data) => ({
+    ...data,
+    startedAt: new Date(data.startedAt),
+    endedAt: new Date(data.endedAt)
+  }));
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type InsertWorkout = z.infer<typeof insertWorkoutSchema>;
 
+// Ranking system constants
 export const ranks = [
   { name: "E Rank", minLevel: 1, maxLevel: 20 },
   { name: "D Rank", minLevel: 20, maxLevel: 40 },
