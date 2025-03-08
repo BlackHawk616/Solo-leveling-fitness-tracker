@@ -12,6 +12,15 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
+type UserData = {
+  email: string;
+  username: string;
+  level: number;
+  exp: number;
+  totalWorkoutSeconds: number;
+  createdAt: Date;
+};
+
 type AuthContextType = {
   user: UserData | null;
   firebaseUser: FirebaseUser | null;
@@ -86,25 +95,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data.password
         );
 
-        let userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-
-        // If user data doesn't exist, create it (fix missing document issue)
-        if (!userDoc.exists()) {
-          console.warn("User document missing, creating new one...");
-          const newUserData: UserData = {
+        try {
+          let userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+  
+          // If user data doesn't exist, create it (fix missing document issue)
+          if (!userDoc.exists()) {
+            console.warn("User document missing, creating new one...");
+            const newUserData: UserData = {
+              email: firebaseUser.email!,
+              username: firebaseUser.displayName || "User",
+              level: 1,
+              exp: 0,
+              totalWorkoutSeconds: 0,
+              createdAt: new Date()
+            };
+            await setDoc(doc(db, "users", firebaseUser.uid), newUserData);
+            userDoc = await getDoc(doc(db, "users", firebaseUser.uid)); // Fetch new document
+          }
+          
+          console.log('Login successful:', firebaseUser.uid);
+          return userDoc.data() as UserData;
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+          // Return basic user data if Firestore access fails
+          return {
             email: firebaseUser.email!,
             username: firebaseUser.displayName || "User",
             level: 1,
             exp: 0,
             totalWorkoutSeconds: 0,
             createdAt: new Date()
-          };
-          await setDoc(doc(db, "users", firebaseUser.uid), newUserData);
-          userDoc = await getDoc(doc(db, "users", firebaseUser.uid)); // Fetch new document
+          } as UserData;
         }
-
-        console.log('Login successful:', firebaseUser.uid);
-        return userDoc.data() as UserData;
       } catch (error: any) {
         console.error('Login error:', error);
         if (
@@ -156,8 +178,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: new Date()
         };
 
-        await setDoc(doc(db, "users", newUser.uid), userData);
-        console.log('User registered successfully:', newUser.uid);
+        try {
+          await setDoc(doc(db, "users", newUser.uid), userData);
+          console.log('User registered successfully:', newUser.uid);
+        } catch (dbError) {
+          console.error('Error saving user data to Firestore:', dbError);
+          // Continue even if Firestore fails - auth succeeded
+        }
+        
         return userData;
       } catch (error: any) {
         console.error('Registration error:', error);
