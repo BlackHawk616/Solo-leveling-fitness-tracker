@@ -18,6 +18,9 @@ import { Timer, Trophy, History, Crown, Star, Shield, Award, Swords, Zap,
   Flame, Sparkles, Gem, Diamond } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, updateDoc } from "firebase/firestore";
+import { WorkoutData } from "@/lib/firebase";
 
 // Update rank icons mapping with more diverse icons
 const rankStyles = {
@@ -37,7 +40,7 @@ const rankStyles = {
 };
 
 export default function HomePage() {
-  const { user, logoutMutation } = useAuth();
+  const { user, firebaseUser, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isTracking, setIsTracking] = useState(false);
   const [workoutName, setWorkoutName] = useState("");
@@ -45,29 +48,61 @@ export default function HomePage() {
   const timerRef = useRef<NodeJS.Timeout>();
   const startTimeRef = useRef<Date>();
 
-  const { data: workouts = [] } = useQuery<Workout[]>({
-    queryKey: ["/api/workouts"]
+  const { data: workouts = [], refetch: refetchWorkouts } = useQuery({
+    queryKey: ["/workouts", firebaseUser?.uid],
+    queryFn: async () => {
+      if (!firebaseUser) return [];
+
+      const workoutsRef = collection(db, "workouts");
+      const q = query(
+        workoutsRef,
+        where("userId", "==", firebaseUser.uid),
+        orderBy("startedAt", "desc"),
+        limit(10)
+      );
+
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as WorkoutData[];
+    },
+    enabled: !!firebaseUser
   });
 
   const workoutMutation = useMutation({
     mutationFn: async (data: { name: string, durationSeconds: number }) => {
-      const res = await apiRequest("POST", "/api/workouts", {
+      if (!firebaseUser || !user) throw new Error("Not authenticated");
+
+      const workout: WorkoutData = {
+        userId: firebaseUser.uid,
         name: data.name,
         durationSeconds: data.durationSeconds,
-        startedAt: startTimeRef.current?.toISOString(),
-        endedAt: new Date().toISOString()
+        startedAt: startTimeRef.current || new Date(),
+        endedAt: new Date()
+      };
+
+      // Add workout to Firestore
+      const workoutRef = await addDoc(collection(db, "workouts"), workout);
+
+      // Update user stats
+      const userRef = doc(db, "users", firebaseUser.uid);
+      const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
+
+      await updateDoc(userRef, {
+        exp: user.exp + expGained,
+        totalWorkoutSeconds: user.totalWorkoutSeconds + data.durationSeconds,
+        level: calculateNewLevel(user.exp + expGained)
       });
-      return await res.json();
+
+      return { workout, expGained };
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(["/api/workouts"],
-        (old: Workout[] = []) => [data.workout, ...old].slice(0, 10)
-      );
-      queryClient.setQueryData(["/api/user"], data.user);
+      refetchWorkouts();
       playSuccessSound();
       toast({
         title: "Workout Completed!",
-        description: `Gained ${Math.floor((data.workout.durationSeconds / 3600) * 1000)} EXP`
+        description: `Gained ${data.expGained} EXP`
       });
     },
     onError: (error: Error) => {
@@ -279,4 +314,12 @@ export default function HomePage() {
       </main>
     </div>
   );
+}
+
+function calculateNewLevel(totalExp: number): number {
+  let level = 1;
+  while (totalExp >= calculateExpForLevel(level)) {
+    level++;
+  }
+  return level;
 }

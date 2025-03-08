@@ -11,6 +11,10 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@firebase/analytics": "^0.10.12",
+    "@firebase/app": "^0.11.2",
+    "@firebase/auth": "^1.9.1",
+    "@firebase/firestore": "^4.7.9",
     "@hookform/resolvers": "^3.9.1",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -53,6 +57,7 @@
     "embla-carousel-react": "^8.3.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
+    "firebase": "^11.4.0",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.453.0",
