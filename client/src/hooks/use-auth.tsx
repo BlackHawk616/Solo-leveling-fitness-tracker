@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    console.log('Setting up auth state listener');
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser?.email);
       setFirebaseUser(firebaseUser);
@@ -74,6 +75,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribe();
   }, []);
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginData) => {
+      console.log('Attempting login:', data.email);
+      try {
+        const { user: firebaseUser } = await signInWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
+
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (!userDoc.exists()) {
+          throw new Error("User data not found");
+        }
+
+        console.log('Login successful:', firebaseUser.uid);
+        return userDoc.data() as UserData;
+      } catch (error: any) {
+        console.error('Login error:', error);
+        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          throw new Error('Invalid email or password');
+        }
+        throw error;
+      }
+    },
+    onSuccess: (userData) => {
+      setUser(userData);
+      toast({
+        title: "Login successful",
+        description: "Welcome back!"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
@@ -119,47 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onError: (error: Error) => {
       toast({
         title: "Registration failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginData) => {
-      console.log('Attempting login:', data.email);
-      try {
-        const { user: firebaseUser } = await signInWithEmailAndPassword(
-          auth,
-          data.email,
-          data.password
-        );
-
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (!userDoc.exists()) {
-          throw new Error("User data not found");
-        }
-
-        console.log('Login successful:', firebaseUser.uid);
-        return userDoc.data() as UserData;
-      } catch (error: any) {
-        console.error('Login error:', error);
-        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-          throw new Error('Invalid email or password');
-        }
-        throw error;
-      }
-    },
-    onSuccess: (userData) => {
-      setUser(userData);
-      toast({
-        title: "Login successful",
-        description: "Welcome back!"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login failed",
         description: error.message,
         variant: "destructive"
       });

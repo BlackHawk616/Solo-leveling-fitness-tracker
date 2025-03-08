@@ -13,34 +13,24 @@ const firebaseConfig = {
   measurementId: "G-7BB0H8VKKS"
 };
 
-let auth;
-let db;
-let analytics;
-let googleProvider;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const analytics = getAnalytics(app);
+const googleProvider = new GoogleAuthProvider();
 
-try {
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  analytics = getAnalytics(app);
-  googleProvider = new GoogleAuthProvider();
+// Enable persistence
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('Firebase persistence enabled');
+  })
+  .catch((error) => {
+    console.error('Firebase persistence error:', error);
+  });
 
-  // Enable persistence
-  setPersistence(auth, browserLocalPersistence)
-    .then(() => {
-      console.log('Firebase persistence enabled');
-    })
-    .catch((error) => {
-      console.error('Firebase persistence error:', error);
-    });
+console.log('Firebase initialized successfully');
 
-  console.log('Firebase initialized successfully');
-} catch (error) {
-  console.error('Firebase initialization error:', error);
-}
-
-// Helper function to format user data for Firestore
+// Helper types for data structure
 export interface UserData {
   email: string;
   username: string;
