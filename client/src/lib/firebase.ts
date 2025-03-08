@@ -26,9 +26,24 @@ setPersistence(auth, browserLocalPersistence)
   })
   .catch((error) => {
     console.error('Firebase persistence error:', error);
+    // Continue even if persistence fails
   });
 
-console.log('Firebase initialized successfully');
+// Add error handler to auth
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    console.log('Firebase auth state changed - user is signed in:', user.uid);
+  } else {
+    console.log('Firebase auth state changed - user is signed out');
+  }
+}, (error) => {
+  console.error('Firebase auth state observer error:', error);
+});
+
+console.log('Firebase initialized successfully with config:', JSON.stringify({
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain
+}));
 
 // Helper types for data structure
 export interface UserData {
