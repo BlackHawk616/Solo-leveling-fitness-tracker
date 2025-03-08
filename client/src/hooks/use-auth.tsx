@@ -8,8 +8,8 @@ import {
   updateProfile,
   User as FirebaseUser
 } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
-import { auth, db, UserData, WorkoutData } from "@/lib/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -77,27 +77,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
-      const { user: newUser } = await createUserWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
+      console.log('Attempting registration:', data.email);
+      try {
+        const { user: newUser } = await createUserWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
 
-      await updateProfile(newUser, {
-        displayName: data.username
-      });
+        await updateProfile(newUser, {
+          displayName: data.username
+        });
 
-      const userData: UserData = {
-        email: data.email,
-        username: data.username,
-        level: 1,
-        exp: 0,
-        totalWorkoutSeconds: 0,
-        createdAt: new Date()
-      };
+        const userData: UserData = {
+          email: data.email,
+          username: data.username,
+          level: 1,
+          exp: 0,
+          totalWorkoutSeconds: 0,
+          createdAt: new Date()
+        };
 
-      await setDoc(doc(db, "users", newUser.uid), userData);
-      return userData;
+        await setDoc(doc(db, "users", newUser.uid), userData);
+        console.log('User registered successfully:', newUser.uid);
+        return userData;
+      } catch (error: any) {
+        console.error('Registration error:', error);
+        if (error.code === 'auth/email-already-in-use') {
+          throw new Error('This email is already registered. Please try logging in instead.');
+        }
+        throw error;
+      }
     },
     onSuccess: (userData) => {
       setUser(userData);
@@ -118,18 +128,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       console.log('Attempting login:', data.email);
-      const { user: firebaseUser } = await signInWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
+      try {
+        const { user: firebaseUser } = await signInWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
 
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-      if (!userDoc.exists()) {
-        throw new Error("User data not found");
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (!userDoc.exists()) {
+          throw new Error("User data not found");
+        }
+
+        console.log('Login successful:', firebaseUser.uid);
+        return userDoc.data() as UserData;
+      } catch (error: any) {
+        console.error('Login error:', error);
+        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          throw new Error('Invalid email or password');
+        }
+        throw error;
       }
-
-      return userDoc.data() as UserData;
     },
     onSuccess: (userData) => {
       setUser(userData);
@@ -139,7 +158,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
-      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
