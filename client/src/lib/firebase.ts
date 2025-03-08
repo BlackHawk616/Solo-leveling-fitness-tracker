@@ -1,5 +1,5 @@
 import { initializeApp } from "@firebase/app";
-import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from "@firebase/auth";
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence, signInWithPopup } from "@firebase/auth";
 import { getFirestore } from "@firebase/firestore";
 import { getAnalytics } from "@firebase/analytics";
 
@@ -17,6 +17,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const analytics = getAnalytics(app);
+const googleProvider = new GoogleAuthProvider();
+
+// Add scopes for additional user info if needed
+googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 const googleProvider = new GoogleAuthProvider();
 
 // Enable persistence
@@ -64,3 +69,14 @@ export interface WorkoutData {
 }
 
 export { auth, db, analytics, googleProvider };
+
+// Helper function for Google sign-in
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  } catch (error) {
+    console.error("Error signing in with Google:", error);
+    throw error;
+  }
+};

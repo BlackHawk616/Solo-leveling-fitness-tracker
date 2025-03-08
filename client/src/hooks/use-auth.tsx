@@ -1,15 +1,14 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   onAuthStateChanged,
-  updateProfile,
-  User as FirebaseUser
+  User as FirebaseUser,
+  GoogleAuthProvider
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, googleProvider } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 type UserData = {
@@ -19,6 +18,7 @@ type UserData = {
   exp: number;
   totalWorkoutSeconds: number;
   createdAt: Date;
+  photoURL?: string;
 };
 
 type AuthContextType = {
@@ -26,20 +26,8 @@ type AuthContextType = {
   firebaseUser: FirebaseUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: any;
+  googleLoginMutation: any;
   logoutMutation: any;
-  registerMutation: any;
-};
-
-type RegisterData = {
-  email: string;
-  password: string;
-  username: string;
-};
-
-type LoginData = {
-  email: string;
-  password: string;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -53,55 +41,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   // Define mutations first, then use them in the provider value
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginData) => {
-      console.log('Attempting login with:', data.email);
+  const googleLoginMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Attempting Google Sign-in');
       try {
         // Clear any previous errors
         setError(null);
-        
-        // Add detailed logging
-        console.log('Calling signInWithEmailAndPassword...');
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          data.email,
-          data.password
-        );
-        console.log('Login successful for user:', userCredential.user.uid);
-        return userCredential.user;
+
+        // Sign in with Google popup
+        const result = await signInWithPopup(auth, googleProvider);
+
+        // This gives you a Google Access Token. You can use it to access the Google API.
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+
+        // The signed-in user info
+        const user = result.user;
+        console.log('Google login successful for user:', user.uid);
+
+        return user;
       } catch (err) {
-        console.error('Firebase login error:', err);
+        console.error('Google sign-in error:', err);
         // More detailed error logging
         if (err instanceof Error) {
           console.error('Error name:', err.name);
           console.error('Error message:', err.message);
         }
-        
+
         const firebaseError = err as { code?: string, message: string };
         console.error('Firebase error code:', firebaseError.code);
-        
+
         // Set a more user-friendly error message based on Firebase error codes
         let errorMessage = firebaseError.message;
-        if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
-          errorMessage = 'Invalid email or password';
-        } else if (firebaseError.code === 'auth/too-many-requests') {
-          errorMessage = 'Too many failed login attempts. Please try again later';
-        } else if (firebaseError.code === 'auth/invalid-credential') {
-          errorMessage = 'Invalid login credentials. Please check your email and password.';
+        if (firebaseError.code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Sign-in popup was closed before completing the login process';
+        } else if (firebaseError.code === 'auth/cancelled-popup-request') {
+          errorMessage = 'Multiple popup requests were triggered. Only the latest will be displayed';
+        } else if (firebaseError.code === 'auth/popup-blocked') {
+          errorMessage = 'The popup was blocked by the browser. Please check your popup settings';
         }
+
         setError(new Error(errorMessage));
         throw new Error(errorMessage);
       }
     },
     onSuccess: (user) => {
-      console.log('Login mutation successful, user:', user.uid);
+      console.log('Google login mutation successful, user:', user.uid);
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
     },
     onError: (error: Error) => {
-      console.log('Login mutation error handler:', error);
+      console.log('Google login mutation error handler:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
@@ -115,9 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signOut(auth);
     },
     onSuccess: () => {
+      console.log('Logged out successfully');
       queryClient.clear();
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
     },
     onError: (error: Error) => {
+      console.error('Logout error:', error);
       toast({
         variant: "destructive",
         title: "Logout failed",
@@ -126,91 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      console.log('Attempting registration:', data.email);
-      try {
-        // Clear any previous errors
-        setError(null);
-        
-        // Create the user account
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          data.email,
-          data.password
-        );
-
-        const user = userCredential.user;
-        console.log('User account created:', user.uid);
-
-        // Update profile with username
-        try {
-          await updateProfile(user, {
-            displayName: data.username,
-          });
-          console.log('Profile updated with username');
-        } catch (profileError) {
-          console.error('Error updating profile:', profileError);
-          // Continue even if profile update fails
-        }
-
-        // Create user document in Firestore
-        try {
-          const userData: UserData = {
-            email: data.email,
-            username: data.username,
-            level: 1,
-            exp: 0,
-            totalWorkoutSeconds: 0,
-            createdAt: new Date(),
-          };
-
-          const userDocRef = doc(db, "users", user.uid);
-          await setDoc(userDocRef, userData);
-          console.log('User document created in Firestore');
-        } catch (firestoreError) {
-          console.error('Error saving user data to Firestore:', firestoreError);
-          // We don't throw here because the authentication succeeded
-          // The auth state change handler will try to create the user doc again
-        }
-
-        return user;
-      } catch (err) {
-        console.error('Registration error:', err);
-        const firebaseError = err as { code?: string, message: string };
-        
-        // Set more user-friendly error messages
-        let errorMessage = firebaseError.message;
-        if (firebaseError.code === 'auth/email-already-in-use') {
-          errorMessage = 'This email is already registered. Please log in instead.';
-        } else if (firebaseError.code === 'auth/weak-password') {
-          errorMessage = 'Password is too weak. Please use a stronger password.';
-        } else if (firebaseError.code?.includes('permission-denied')) {
-          errorMessage = 'Permission denied. Please check your Firebase security rules.';
-        }
-        
-        setError(new Error(errorMessage));
-        throw new Error(errorMessage);
-      }
-    },
-    onError: (error: Error) => {
-      console.error('Registration error handler:', error);
-      toast({
-        variant: "destructive",
-        title: "Registration failed",
-        description: error.message,
-      });
-    },
-  });
-
   useEffect(() => {
     console.log('Setting up auth state listener');
     setIsLoading(true);
-    
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser?.email);
       setFirebaseUser(firebaseUser);
-      
+
       try {
         if (firebaseUser) {
           // Get user data from Firestore with better error handling
@@ -218,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('Fetching user document for:', firebaseUser.uid);
             const userDocRef = doc(db, "users", firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
-            
+
             if (userDoc.exists()) {
               console.log('User data found:', userDoc.data());
               // Convert Firestore timestamp to Date if needed
@@ -236,46 +157,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 level: 1,
                 exp: 0,
                 totalWorkoutSeconds: 0,
-                createdAt: new Date()
+                createdAt: new Date(),
+                photoURL: firebaseUser.photoURL || undefined
               };
 
+              // Save user profile to Firestore
               try {
-                // Use set with merge option to handle potential race conditions
-                await setDoc(userDocRef, basicUserData, { merge: true });
-                console.log('Basic user profile created successfully');
+                await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
+                console.log('Created new user profile in Firestore');
                 setUser(basicUserData);
-              } catch (writeError) {
-                console.error('Error creating user profile:', writeError);
-                // Still set the user data locally even if the write fails
-                setUser(basicUserData);
+              } catch (err) {
+                console.error('Error creating user profile:', err);
               }
             }
-          } catch (dbError) {
-            console.error('Error accessing Firestore:', dbError);
-            // Provide minimal user data if Firestore access fails
-            setUser({
-              email: firebaseUser.email!,
-              username: firebaseUser.displayName || "User",
-              level: 1,
-              exp: 0,
-              totalWorkoutSeconds: 0,
-              createdAt: new Date()
-            } as UserData);
+          } catch (err) {
+            console.error('Error fetching user data:', err);
           }
         } else {
-          console.log('No firebase user, clearing user state');
+          console.log('No firebase user');
           setUser(null);
         }
-      } catch (error) {
-        console.error('Error in auth state change handler:', error);
-        setError(error as Error);
-        setUser(null);
       } finally {
         setIsLoading(false);
       }
+    }, (error) => {
+      console.error('Firebase auth state error:', error);
+      setIsLoading(false);
+      setError(error as Error);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('Cleaning up auth state listener');
+      unsubscribe();
+    };
   }, []);
 
   return (
@@ -285,9 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         isLoading,
         error,
-        loginMutation,
-        logoutMutation,
-        registerMutation
+        googleLoginMutation,
+        logoutMutation
       }}
     >
       {children}
