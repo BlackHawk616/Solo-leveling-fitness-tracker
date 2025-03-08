@@ -1,38 +1,42 @@
-import { initializeApp } from "@firebase/app";
-import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence, signInWithPopup } from "@firebase/auth";
-import { getFirestore } from "@firebase/firestore";
-import { getAnalytics } from "@firebase/analytics";
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider, TwitterAuthProvider } from 'firebase/auth';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDEkXTy5zHU620bU-xdu27h-UQ2CCzLTfU",
-  authDomain: "fitness-leveling01.firebaseapp.com",
-  projectId: "fitness-leveling01",
-  storageBucket: "fitness-leveling01.appspot.com",
-  messagingSenderId: "475932739073",
-  appId: "1:475932739073:web:9383f46747c68c14d06200",
-  measurementId: "G-7BB0H8VKKS"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const analytics = getAnalytics(app);
+const storage = getStorage(app);
+
+// Enable offline persistence
+enableIndexedDbPersistence(db)
+  .then(() => {
+    console.log('Firebase persistence enabled');
+  })
+  .catch((err) => {
+    console.error('Firebase persistence error:', err);
+  });
+
+// Auth providers
 const googleProvider = new GoogleAuthProvider();
+const facebookProvider = new FacebookAuthProvider();
+const twitterProvider = new TwitterAuthProvider();
 
 // Add scopes for additional user info if needed
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-const googleProvider = new GoogleAuthProvider();
 
-// Enable persistence
-setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log('Firebase persistence enabled');
-  })
-  .catch((error) => {
-    console.error('Firebase persistence error:', error);
-    // Continue even if persistence fails
-  });
 
 // Add error handler to auth
 auth.onAuthStateChanged((user) => {
@@ -68,7 +72,7 @@ export interface WorkoutData {
   endedAt: Date;
 }
 
-export { auth, db, analytics, googleProvider };
+export { auth, db, storage, googleProvider, facebookProvider, twitterProvider };
 
 // Helper function for Google sign-in
 export const signInWithGoogle = async () => {
