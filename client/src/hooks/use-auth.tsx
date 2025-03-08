@@ -51,6 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  
+  // Define mutations first, then use them in the provider value
+  const loginMutationFn = useMutation({
+    mutationFn: async (data: LoginData) => {
 
   useEffect(() => {
     console.log('Setting up auth state listener');
@@ -61,21 +65,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         if (firebaseUser) {
-          // Get user data from Firestore
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-          if (userDoc.exists()) {
-            console.log('User data found:', userDoc.data());
-            setUser(userDoc.data() as UserData);
-          } else {
-            console.log('No user data found');
-            setUser(null);
+          try {
+            // Get user data from Firestore
+            const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+            if (userDoc.exists()) {
+              console.log('User data found:', userDoc.data());
+              setUser(userDoc.data() as UserData);
+            } else {
+              console.log('No user data found, creating basic profile');
+              // Create basic user profile if Firestore doesn't have data
+              const basicUserData: UserData = {
+                email: firebaseUser.email!,
+                username: firebaseUser.displayName || "User",
+                level: 1,
+                exp: 0,
+                totalWorkoutSeconds: 0,
+                createdAt: new Date()
+              };
+              
+              try {
+                await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
+                console.log('Basic user profile created');
+              } catch (writeError) {
+                console.error('Error creating user profile:', writeError);
+                // Continue even if write fails
+              }
+              
+              setUser(basicUserData);
+            }
+          } catch (dbError) {
+            console.error('Error accessing Firestore:', dbError);
+            // Use basic user data if Firestore fails
+            setUser({
+              email: firebaseUser.email!,
+              username: firebaseUser.displayName || "User",
+              level: 1,
+              exp: 0,
+              totalWorkoutSeconds: 0,
+              createdAt: new Date()
+            } as UserData);
           }
         } else {
           console.log('No firebase user');
           setUser(null);
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error in auth state change:', error);
         setError(error as Error);
       } finally {
         setIsLoading(false);
@@ -238,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         isLoading,
         error,
-        loginMutation,
+        loginMutation: loginMutationFn,
         logoutMutation,
         registerMutation
       }}
