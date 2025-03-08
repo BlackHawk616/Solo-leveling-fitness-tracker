@@ -4,7 +4,8 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  username: text("username").notNull(),
   password: text("password").notNull(),
   level: integer("level").notNull().default(1),
   exp: integer("exp").notNull().default(0),
@@ -20,12 +21,17 @@ export const workouts = pgTable("workouts", {
   endedAt: timestamp("ended_at").notNull()
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true
-});
+export const insertUserSchema = createInsertSchema(users)
+  .pick({
+    email: true,
+    username: true,
+    password: true
+  })
+  .extend({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters")
+  });
 
-// Update the workout schema to handle dates correctly
 export const insertWorkoutSchema = createInsertSchema(workouts)
   .pick({
     name: true,

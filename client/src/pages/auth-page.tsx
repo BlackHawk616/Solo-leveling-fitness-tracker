@@ -45,11 +45,17 @@ export default function AuthPage() {
                 <form onSubmit={loginForm.handleSubmit(data => loginMutation.mutate(data))}>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="login-username">Username</Label>
+                      <Label htmlFor="login-email">Email</Label>
                       <Input 
-                        id="login-username"
-                        {...loginForm.register("username")}
+                        id="login-email"
+                        type="email"
+                        {...loginForm.register("email")}
                       />
+                      {loginForm.formState.errors.email && (
+                        <p className="text-sm text-destructive mt-1">
+                          {loginForm.formState.errors.email.message}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="login-password">Password</Label>
@@ -58,6 +64,11 @@ export default function AuthPage() {
                         type="password"
                         {...loginForm.register("password")}
                       />
+                      {loginForm.formState.errors.password && (
+                        <p className="text-sm text-destructive mt-1">
+                          {loginForm.formState.errors.password.message}
+                        </p>
+                      )}
                     </div>
                     <Button 
                       type="submit" 
@@ -77,11 +88,29 @@ export default function AuthPage() {
                 <form onSubmit={registerForm.handleSubmit(data => registerMutation.mutate(data))}>
                   <div className="space-y-4">
                     <div>
+                      <Label htmlFor="register-email">Email</Label>
+                      <Input 
+                        id="register-email"
+                        type="email"
+                        {...registerForm.register("email")}
+                      />
+                      {registerForm.formState.errors.email && (
+                        <p className="text-sm text-destructive mt-1">
+                          {registerForm.formState.errors.email.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
                       <Label htmlFor="register-username">Username</Label>
                       <Input 
                         id="register-username"
                         {...registerForm.register("username")}
                       />
+                      {registerForm.formState.errors.username && (
+                        <p className="text-sm text-destructive mt-1">
+                          {registerForm.formState.errors.username.message}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="register-password">Password</Label>
@@ -90,6 +119,11 @@ export default function AuthPage() {
                         type="password"
                         {...registerForm.register("password")}
                       />
+                      {registerForm.formState.errors.password && (
+                        <p className="text-sm text-destructive mt-1">
+                          {registerForm.formState.errors.password.message}
+                        </p>
+                      )}
                     </div>
                     <Button 
                       type="submit" 

@@ -6,14 +6,14 @@ const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserExp(userId: number, expGained: number): Promise<User>;
-  
+
   createWorkout(userId: number, workout: InsertWorkout): Promise<Workout>;
   getWorkouts(userId: number): Promise<Workout[]>;
   getDailyWorkoutSeconds(userId: number, date: Date): Promise<number>;
-  
+
   sessionStore: session.Store;
 }
 
@@ -38,9 +38,9 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByEmail(email: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username
+      (user) => user.email === email
     );
   }
 
@@ -63,7 +63,7 @@ export class MemStorage implements IStorage {
 
     const newExp = user.exp + expGained;
     let newLevel = user.level;
-    
+
     while (newExp >= calculateExpForLevel(newLevel)) {
       newLevel++;
     }
@@ -73,7 +73,7 @@ export class MemStorage implements IStorage {
       exp: newExp,
       level: newLevel
     };
-    
+
     this.users.set(userId, updatedUser);
     return updatedUser;
   }
@@ -98,7 +98,7 @@ export class MemStorage implements IStorage {
   async getDailyWorkoutSeconds(userId: number, date: Date): Promise<number> {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
-    
+
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
