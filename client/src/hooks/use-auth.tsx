@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   // Define mutations first, then use them in the provider value
-  const loginMutationFn = useMutation({
+  const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       console.log('Attempting login:', data.email);
       const userCredential = await signInWithEmailAndPassword(
@@ -205,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         isLoading,
         error,
-        loginMutation: loginMutationFn,
+        loginMutation,
         logoutMutation,
         registerMutation
       }}
