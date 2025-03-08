@@ -32,18 +32,12 @@ export const insertUserSchema = createInsertSchema(users)
     password: z.string().min(6, "Password must be at least 6 characters")
   });
 
-export const insertWorkoutSchema = createInsertSchema(workouts)
-  .pick({
-    name: true,
-    durationSeconds: true,
-    startedAt: true,
-    endedAt: true
-  })
-  .transform((data) => ({
-    ...data,
-    startedAt: new Date(data.startedAt),
-    endedAt: new Date(data.endedAt)
-  }));
+export const insertWorkoutSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
+  startedAt: z.string().transform(str => new Date(str)),
+  endedAt: z.string().transform(str => new Date(str)),
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

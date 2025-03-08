@@ -14,8 +14,25 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Workout, ranks, getRankForLevel, calculateExpForLevel } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDuration, formatDate } from "@/lib/workout";
-import { Timer, Trophy, History, Crown } from "lucide-react";
+import { Timer, Trophy, History, Crown, Star, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// Rank icons and colors mapping
+const rankStyles = {
+  "E Rank": { icon: Shield, color: "text-gray-400", bg: "bg-gray-400/10" },
+  "D Rank": { icon: Shield, color: "text-bronze-400", bg: "bg-bronze-400/10" },
+  "C Rank": { icon: Shield, color: "text-green-400", bg: "bg-green-400/10" },
+  "B Rank": { icon: Shield, color: "text-blue-400", bg: "bg-blue-400/10" },
+  "A Rank": { icon: Star, color: "text-yellow-400", bg: "bg-yellow-400/10" },
+  "S Rank": { icon: Crown, color: "text-purple-400", bg: "bg-purple-400/10" },
+  "National Level": { icon: Crown, color: "text-red-400", bg: "bg-red-400/10" },
+  "Mid Tier Monarch": { icon: Crown, color: "text-pink-400", bg: "bg-pink-400/10" },
+  "Yogumunt": { icon: Crown, color: "text-indigo-400", bg: "bg-indigo-400/10" },
+  "Architect": { icon: Crown, color: "text-cyan-400", bg: "bg-cyan-400/10" },
+  "Amtares": { icon: Crown, color: "text-emerald-400", bg: "bg-emerald-400/10" },
+  "Ashborn": { icon: Crown, color: "text-orange-400", bg: "bg-orange-400/10" },
+  "Sung Jinwo": { icon: Crown, color: "text-purple-600", bg: "bg-purple-600/20" }
+};
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
@@ -49,12 +66,21 @@ export default function HomePage() {
         title: "Workout Completed!",
         description: `Gained ${Math.floor((data.workout.durationSeconds / 3600) * 1000)} EXP`
       });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to save workout",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   });
 
   const rank = getRankForLevel(user?.level ?? 1);
   const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
   const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
+  const rankStyle = rankStyles[rank.name];
+  const RankIcon = rankStyle.icon;
 
   useEffect(() => {
     return () => {
@@ -86,21 +112,27 @@ export default function HomePage() {
       clearInterval(timerRef.current);
     }
     setIsTracking(false);
-    
-    await workoutMutation.mutateAsync({
-      name: workoutName,
-      durationSeconds: elapsedSeconds
-    });
 
-    setWorkoutName("");
-    setElapsedSeconds(0);
+    try {
+      await workoutMutation.mutateAsync({
+        name: workoutName,
+        durationSeconds: elapsedSeconds
+      });
+
+      setWorkoutName("");
+      setElapsedSeconds(0);
+    } catch (error) {
+      console.error("Failed to save workout:", error);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary">Fitness RPG</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+            Solo Leveling Fitness
+          </h1>
           <Button variant="outline" onClick={() => logoutMutation.mutate()}>
             Logout
           </Button>
@@ -109,13 +141,13 @@ export default function HomePage() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid gap-8 md:grid-cols-2">
-          <Card>
+          <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-primary" />
+                <RankIcon className={`h-6 w-6 ${rankStyle.color}`} />
                 {user?.username}'s Profile
               </CardTitle>
-              <CardDescription>
+              <CardDescription className={`font-semibold ${rankStyle.color}`}>
                 Level {user?.level} • {rank.name}
               </CardDescription>
             </CardHeader>
@@ -126,15 +158,15 @@ export default function HomePage() {
                     <span>EXP Progress</span>
                     <span>{user?.exp ?? 0} / {expForNextLevel}</span>
                   </div>
-                  <Progress value={expProgress} />
+                  <Progress value={expProgress} className="bg-primary/20" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-primary/5 rounded-lg">
-                    <Trophy className="h-5 w-5 mx-auto mb-2 text-primary" />
+                  <div className={`text-center p-4 rounded-lg ${rankStyle.bg}`}>
+                    <Trophy className={`h-5 w-5 mx-auto mb-2 ${rankStyle.color}`} />
                     <div className="font-medium">{rank.name}</div>
                   </div>
-                  <div className="text-center p-4 bg-primary/5 rounded-lg">
-                    <Timer className="h-5 w-5 mx-auto mb-2 text-primary" />
+                  <div className={`text-center p-4 rounded-lg ${rankStyle.bg}`}>
+                    <Timer className={`h-5 w-5 mx-auto mb-2 ${rankStyle.color}`} />
                     <div className="font-medium">
                       {formatDuration(user?.totalWorkoutSeconds ?? 0)}
                     </div>
@@ -144,7 +176,7 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Timer className="h-5 w-5 text-primary" />
@@ -160,11 +192,11 @@ export default function HomePage() {
                   disabled={isTracking}
                 />
                 <div className="text-center">
-                  <div className="text-4xl font-mono mb-4">
+                  <div className="text-4xl font-mono mb-4 text-primary">
                     {formatDuration(elapsedSeconds)}
                   </div>
                   {!isTracking ? (
-                    <Button onClick={startWorkout} className="w-full">
+                    <Button onClick={startWorkout} className="w-full bg-gradient-to-r from-primary to-purple-600">
                       Start Workout
                     </Button>
                   ) : (
@@ -182,7 +214,7 @@ export default function HomePage() {
           </Card>
         </div>
 
-        <Card className="mt-8">
+        <Card className="mt-8 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
@@ -202,11 +234,42 @@ export default function HomePage() {
                       {formatDate(new Date(workout.startedAt))}
                     </div>
                   </div>
-                  <div className="font-mono">
+                  <div className="font-mono text-primary">
                     {formatDuration(workout.durationSeconds)}
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-8 border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-primary" />
+              Available Ranks
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {ranks.map(rankInfo => {
+                const style = rankStyles[rankInfo.name];
+                const Icon = style.icon;
+                return (
+                  <div
+                    key={rankInfo.name}
+                    className={`p-4 rounded-lg ${style.bg} flex items-center gap-3`}
+                  >
+                    <Icon className={`h-5 w-5 ${style.color}`} />
+                    <div>
+                      <div className={`font-medium ${style.color}`}>{rankInfo.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Level {rankInfo.minLevel} - {rankInfo.maxLevel === Infinity ? '∞' : rankInfo.maxLevel}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

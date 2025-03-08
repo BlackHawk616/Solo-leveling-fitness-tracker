@@ -40,7 +40,8 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax'
     }
   };
 
@@ -66,10 +67,16 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
       done(null, user);
     } catch (err) {
       done(err);
@@ -89,22 +96,32 @@ export function setupAuth(app: Express) {
       });
 
       req.login(user, (err) => {
-        if (err) throw err;
+        if (err) {
+          console.error('Login error after registration:', err);
+          return res.status(500).json({ message: "Registration succeeded but login failed" });
+        }
         res.status(201).json(user);
       });
     } catch (err) {
+      console.error('Registration error:', err);
       res.status(500).json({ message: "Registration failed" });
     }
   });
 
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
+      if (err) {
+        console.error('Login error:', err);
+        return next(err);
+      }
       if (!user) {
         return res.status(401).json({ message: info?.message || "Authentication failed" });
       }
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error('Session creation error:', err);
+          return next(err);
+        }
         res.json(user);
       });
     })(req, res, next);
