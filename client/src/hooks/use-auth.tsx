@@ -55,34 +55,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Define mutations first, then use them in the provider value
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
-      console.log('Attempting login:', data.email);
+      console.log('Attempting login with:', data.email);
       try {
         // Clear any previous errors
         setError(null);
         
+        // Add detailed logging
+        console.log('Calling signInWithEmailAndPassword...');
         const userCredential = await signInWithEmailAndPassword(
           auth,
           data.email,
           data.password
         );
-        console.log('Login successful', userCredential.user.uid);
+        console.log('Login successful for user:', userCredential.user.uid);
         return userCredential.user;
       } catch (err) {
         console.error('Firebase login error:', err);
+        // More detailed error logging
+        if (err instanceof Error) {
+          console.error('Error name:', err.name);
+          console.error('Error message:', err.message);
+        }
+        
         const firebaseError = err as { code?: string, message: string };
+        console.error('Firebase error code:', firebaseError.code);
+        
         // Set a more user-friendly error message based on Firebase error codes
         let errorMessage = firebaseError.message;
         if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
           errorMessage = 'Invalid email or password';
         } else if (firebaseError.code === 'auth/too-many-requests') {
           errorMessage = 'Too many failed login attempts. Please try again later';
+        } else if (firebaseError.code === 'auth/invalid-credential') {
+          errorMessage = 'Invalid login credentials. Please check your email and password.';
         }
         setError(new Error(errorMessage));
         throw new Error(errorMessage);
       }
     },
+    onSuccess: (user) => {
+      console.log('Login mutation successful, user:', user.uid);
+      toast({
+        title: "Login successful",
+        description: "You have been logged in successfully.",
+      });
+    },
     onError: (error: Error) => {
-      console.log('Login error:', error);
+      console.log('Login mutation error handler:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
