@@ -86,16 +86,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data.password
         );
 
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        let userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+        // If user data doesn't exist, create it (fix missing document issue)
         if (!userDoc.exists()) {
-          throw new Error("User data not found");
+          console.warn("User document missing, creating new one...");
+          const newUserData: UserData = {
+            email: firebaseUser.email!,
+            username: firebaseUser.displayName || "User",
+            level: 1,
+            exp: 0,
+            totalWorkoutSeconds: 0,
+            createdAt: new Date()
+          };
+          await setDoc(doc(db, "users", firebaseUser.uid), newUserData);
+          userDoc = await getDoc(doc(db, "users", firebaseUser.uid)); // Fetch new document
         }
 
         console.log('Login successful:', firebaseUser.uid);
         return userDoc.data() as UserData;
       } catch (error: any) {
         console.error('Login error:', error);
-        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        if (
+          error.code === 'auth/invalid-email' || 
+          error.code === 'auth/user-not-found' || 
+          error.code === 'auth/wrong-password'
+        ) {
           throw new Error('Invalid email or password');
         }
         throw error;
