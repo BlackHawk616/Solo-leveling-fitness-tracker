@@ -51,10 +51,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  
+
   // Define mutations first, then use them in the provider value
   const loginMutationFn = useMutation({
     mutationFn: async (data: LoginData) => {
+      console.log('Attempting login:', data.email);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+      return userCredential.user;
+    },
+    onError: (error: Error) => {
+      console.log('Login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message,
+      });
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await signOut(auth);
+    },
+    onSuccess: () => {
+      queryClient.clear();
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Logout failed",
+        description: error.message,
+      });
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterData) => {
+      console.log('Attempting registration:', data.email);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+
+      const user = userCredential.user;
+
+      // Update profile with username
+      await updateProfile(user, {
+        displayName: data.username,
+      });
+
+      // Create user document in Firestore
+      try {
+        const userData: UserData = {
+          email: data.email,
+          username: data.username,
+          level: 1,
+          exp: 0,
+          totalWorkoutSeconds: 0,
+          createdAt: new Date(),
+        };
+
+        await setDoc(doc(db, "users", user.uid), userData);
+      } catch (error) {
+        console.log('Error saving user data to Firestore:', error);
+        throw error;
+      }
+
+      return user;
+    },
+    onError: (error: Error) => {
+      console.log('Registration error:', error);
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: error.message,
+      });
+    },
+  });
 
   useEffect(() => {
     console.log('Setting up auth state listener');
@@ -82,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 totalWorkoutSeconds: 0,
                 createdAt: new Date()
               };
-              
+
               try {
                 await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
                 console.log('Basic user profile created');
@@ -90,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('Error creating user profile:', writeError);
                 // Continue even if write fails
               }
-              
+
               setUser(basicUserData);
             }
           } catch (dbError) {
@@ -119,152 +197,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribe();
   }, []);
-
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginData) => {
-      console.log('Attempting login:', data.email);
-      try {
-        const { user: firebaseUser } = await signInWithEmailAndPassword(
-          auth,
-          data.email,
-          data.password
-        );
-
-        try {
-          let userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-  
-          // If user data doesn't exist, create it (fix missing document issue)
-          if (!userDoc.exists()) {
-            console.warn("User document missing, creating new one...");
-            const newUserData: UserData = {
-              email: firebaseUser.email!,
-              username: firebaseUser.displayName || "User",
-              level: 1,
-              exp: 0,
-              totalWorkoutSeconds: 0,
-              createdAt: new Date()
-            };
-            await setDoc(doc(db, "users", firebaseUser.uid), newUserData);
-            userDoc = await getDoc(doc(db, "users", firebaseUser.uid)); // Fetch new document
-          }
-          
-          console.log('Login successful:', firebaseUser.uid);
-          return userDoc.data() as UserData;
-        } catch (dbError) {
-          console.error('Database error:', dbError);
-          // Return basic user data if Firestore access fails
-          return {
-            email: firebaseUser.email!,
-            username: firebaseUser.displayName || "User",
-            level: 1,
-            exp: 0,
-            totalWorkoutSeconds: 0,
-            createdAt: new Date()
-          } as UserData;
-        }
-      } catch (error: any) {
-        console.error('Login error:', error);
-        if (
-          error.code === 'auth/invalid-email' || 
-          error.code === 'auth/user-not-found' || 
-          error.code === 'auth/wrong-password'
-        ) {
-          throw new Error('Invalid email or password');
-        }
-        throw error;
-      }
-    },
-    onSuccess: (userData) => {
-      setUser(userData);
-      toast({
-        title: "Login successful",
-        description: "Welcome back!"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      console.log('Attempting registration:', data.email);
-      try {
-        const { user: newUser } = await createUserWithEmailAndPassword(
-          auth,
-          data.email,
-          data.password
-        );
-
-        await updateProfile(newUser, {
-          displayName: data.username
-        });
-
-        const userData: UserData = {
-          email: data.email,
-          username: data.username,
-          level: 1,
-          exp: 0,
-          totalWorkoutSeconds: 0,
-          createdAt: new Date()
-        };
-
-        try {
-          await setDoc(doc(db, "users", newUser.uid), userData);
-          console.log('User registered successfully:', newUser.uid);
-        } catch (dbError) {
-          console.error('Error saving user data to Firestore:', dbError);
-          // Continue even if Firestore fails - auth succeeded
-        }
-        
-        return userData;
-      } catch (error: any) {
-        console.error('Registration error:', error);
-        if (error.code === 'auth/email-already-in-use') {
-          throw new Error('This email is already registered. Please try logging in instead.');
-        }
-        throw error;
-      }
-    },
-    onSuccess: (userData) => {
-      setUser(userData);
-      toast({
-        title: "Registration successful",
-        description: "Welcome to Solo Leveling Fitness!"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await signOut(auth);
-    },
-    onSuccess: () => {
-      setUser(null);
-      queryClient.clear();
-      toast({
-        title: "Logged out successfully"
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
 
   return (
     <AuthContext.Provider
