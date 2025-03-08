@@ -56,12 +56,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       console.log('Attempting login:', data.email);
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
-      return userCredential.user;
+      try {
+        // Clear any previous errors
+        setError(null);
+        
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
+        console.log('Login successful', userCredential.user.uid);
+        return userCredential.user;
+      } catch (err) {
+        console.error('Firebase login error:', err);
+        const firebaseError = err as { code?: string, message: string };
+        // Set a more user-friendly error message based on Firebase error codes
+        let errorMessage = firebaseError.message;
+        if (firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
+          errorMessage = 'Invalid email or password';
+        } else if (firebaseError.code === 'auth/too-many-requests') {
+          errorMessage = 'Too many failed login attempts. Please try again later';
+        }
+        setError(new Error(errorMessage));
+        throw new Error(errorMessage);
+      }
     },
     onError: (error: Error) => {
       console.log('Login error:', error);
@@ -92,40 +110,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
       console.log('Attempting registration:', data.email);
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
-
-      const user = userCredential.user;
-
-      // Update profile with username
-      await updateProfile(user, {
-        displayName: data.username,
-      });
-
-      // Create user document in Firestore
       try {
-        const userData: UserData = {
-          email: data.email,
-          username: data.username,
-          level: 1,
-          exp: 0,
-          totalWorkoutSeconds: 0,
-          createdAt: new Date(),
-        };
+        // Clear any previous errors
+        setError(null);
+        
+        // Create the user account
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
 
-        await setDoc(doc(db, "users", user.uid), userData);
-      } catch (error) {
-        console.log('Error saving user data to Firestore:', error);
-        throw error;
+        const user = userCredential.user;
+        console.log('User account created:', user.uid);
+
+        // Update profile with username
+        try {
+          await updateProfile(user, {
+            displayName: data.username,
+          });
+          console.log('Profile updated with username');
+        } catch (profileError) {
+          console.error('Error updating profile:', profileError);
+          // Continue even if profile update fails
+        }
+
+        // Create user document in Firestore
+        try {
+          const userData: UserData = {
+            email: data.email,
+            username: data.username,
+            level: 1,
+            exp: 0,
+            totalWorkoutSeconds: 0,
+            createdAt: new Date(),
+          };
+
+          const userDocRef = doc(db, "users", user.uid);
+          await setDoc(userDocRef, userData);
+          console.log('User document created in Firestore');
+        } catch (firestoreError) {
+          console.error('Error saving user data to Firestore:', firestoreError);
+          // We don't throw here because the authentication succeeded
+          // The auth state change handler will try to create the user doc again
+        }
+
+        return user;
+      } catch (err) {
+        console.error('Registration error:', err);
+        const firebaseError = err as { code?: string, message: string };
+        
+        // Set more user-friendly error messages
+        let errorMessage = firebaseError.message;
+        if (firebaseError.code === 'auth/email-already-in-use') {
+          errorMessage = 'This email is already registered. Please log in instead.';
+        } else if (firebaseError.code === 'auth/weak-password') {
+          errorMessage = 'Password is too weak. Please use a stronger password.';
+        } else if (firebaseError.code?.includes('permission-denied')) {
+          errorMessage = 'Permission denied. Please check your Firebase security rules.';
+        }
+        
+        setError(new Error(errorMessage));
+        throw new Error(errorMessage);
       }
-
-      return user;
     },
     onError: (error: Error) => {
-      console.log('Registration error:', error);
+      console.error('Registration error handler:', error);
       toast({
         variant: "destructive",
         title: "Registration failed",
@@ -136,21 +186,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     console.log('Setting up auth state listener');
+    setIsLoading(true);
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser?.email);
       setFirebaseUser(firebaseUser);
-      setIsLoading(true);
-
+      
       try {
         if (firebaseUser) {
+          // Get user data from Firestore with better error handling
           try {
-            // Get user data from Firestore
-            const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+            console.log('Fetching user document for:', firebaseUser.uid);
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            
             if (userDoc.exists()) {
               console.log('User data found:', userDoc.data());
-              setUser(userDoc.data() as UserData);
+              // Convert Firestore timestamp to Date if needed
+              const userData = userDoc.data();
+              if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
+                userData.createdAt = userData.createdAt.toDate();
+              }
+              setUser(userData as UserData);
             } else {
-              console.log('No user data found, creating basic profile');
+              console.log('No user document found, creating basic profile');
               // Create basic user profile if Firestore doesn't have data
               const basicUserData: UserData = {
                 email: firebaseUser.email!,
@@ -162,18 +221,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               };
 
               try {
-                await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
-                console.log('Basic user profile created');
+                // Use set with merge option to handle potential race conditions
+                await setDoc(userDocRef, basicUserData, { merge: true });
+                console.log('Basic user profile created successfully');
+                setUser(basicUserData);
               } catch (writeError) {
                 console.error('Error creating user profile:', writeError);
-                // Continue even if write fails
+                // Still set the user data locally even if the write fails
+                setUser(basicUserData);
               }
-
-              setUser(basicUserData);
             }
           } catch (dbError) {
             console.error('Error accessing Firestore:', dbError);
-            // Use basic user data if Firestore fails
+            // Provide minimal user data if Firestore access fails
             setUser({
               email: firebaseUser.email!,
               username: firebaseUser.displayName || "User",
@@ -184,12 +244,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } as UserData);
           }
         } else {
-          console.log('No firebase user');
+          console.log('No firebase user, clearing user state');
           setUser(null);
         }
       } catch (error) {
-        console.error('Error in auth state change:', error);
+        console.error('Error in auth state change handler:', error);
         setError(error as Error);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
