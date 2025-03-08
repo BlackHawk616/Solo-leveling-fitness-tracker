@@ -92,7 +92,8 @@ export class MemStorage implements IStorage {
   async getWorkouts(userId: number): Promise<Workout[]> {
     return Array.from(this.workouts.values())
       .filter(workout => workout.userId === userId)
-      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, 10); // Limit to 10 entries
   }
 
   async getDailyWorkoutSeconds(userId: number, date: Date): Promise<number> {
