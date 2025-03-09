@@ -1,16 +1,17 @@
+
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider, TwitterAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider, TwitterAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDEkXTy5zHU620bU-xdu27h-UQ2CCzLTfU",
+  authDomain: "fitness-leveling01.firebaseapp.com",
+  projectId: "fitness-leveling01",
+  storageBucket: "fitness-leveling01.appspot.com",
+  messagingSenderId: "475932739073",
+  appId: "1:475932739073:web:9383f46747c68c14d06200",
 };
 
 // Initialize Firebase with error handling
@@ -20,7 +21,6 @@ try {
   console.log('Firebase app initialized successfully');
 } catch (error) {
   console.error('Firebase initialization error:', error);
-  // Log config without sensitive data
   console.error('Firebase config issue. Check your environment variables and API keys.');
 }
 
@@ -45,7 +45,6 @@ const twitterProvider = new TwitterAuthProvider();
 // Add scopes for additional user info if needed
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-
 
 // Add error handler to auth
 auth.onAuthStateChanged((user) => {
@@ -93,6 +92,3 @@ export const signInWithGoogle = async () => {
     throw error;
   }
 };
-
-// Import the signInWithPopup function
-import { signInWithPopup } from 'firebase/auth';
