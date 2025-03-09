@@ -244,13 +244,16 @@ export default function HomePage() {
       clearInterval(timerRef.current);
     }
 
+    // Set the start time and reset elapsed seconds
     startTimeRef.current = new Date();
     setElapsedSeconds(0);
     setIsTracking(true);
 
+    // Start the timer
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => {
         const next = prev + 1;
+        // Cap at 6 hours
         if (next >= 6 * 60 * 60) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -265,11 +268,27 @@ export default function HomePage() {
 
   // Stop workout
   async function stopWorkout() {
+    // Only proceed if we're actually tracking
+    if (!isTracking) return;
+    
+    // Clear the timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = undefined;
     }
 
+    // Stop tracking before API call to prevent UI glitches
     setIsTracking(false);
+
+    // Don't submit if elapsed time is too short
+    if (elapsedSeconds < 1) {
+      toast({
+        title: "Workout too short",
+        description: "Workout must be at least 1 second long",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       await workoutMutation.mutateAsync({
@@ -281,6 +300,8 @@ export default function HomePage() {
       await updateUserProfile({ currentWorkout: null });
     } catch (error) {
       console.error("Failed to save workout:", error);
+      // Restore tracking state if the API call fails
+      setIsTracking(true);
     }
   }
 
@@ -406,24 +427,20 @@ export default function HomePage() {
                   value={workoutName}
                   onChange={e => setWorkoutName(e.target.value)}
                   disabled={isTracking}
+                  className="mb-4"
                 />
                 <div className="text-center">
                   <div className="text-4xl font-mono mb-4 text-primary">
                     {formatDuration(elapsedSeconds)}
                   </div>
-                  {!isTracking ? (
-                    <Button onClick={startWorkout} className="w-full bg-gradient-to-r from-primary to-purple-600">
-                      Start Workout
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={stopWorkout}
-                      variant="destructive"
-                      className="w-full"
-                    >
-                      Stop Workout
-                    </Button>
-                  )}
+                  <Button 
+                    onClick={isTracking ? stopWorkout : startWorkout} 
+                    variant={isTracking ? "destructive" : "default"}
+                    className={`w-full ${!isTracking ? "bg-gradient-to-r from-primary to-purple-600" : ""}`}
+                    disabled={workoutMutation.isPending}
+                  >
+                    {isTracking ? "Stop Workout" : "Start Workout"}
+                  </Button>
                 </div>
               </div>
             </CardContent>
