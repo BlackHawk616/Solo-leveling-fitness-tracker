@@ -28,6 +28,7 @@ type AuthContextType = {
   error: Error | null;
   googleLoginMutation: any;
   logoutMutation: any;
+  refreshUserData: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -132,6 +133,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Function to fetch user data that can be called to refresh user data
+  const fetchUserData = async (firebaseUser: FirebaseUser) => {
+    if (!firebaseUser) return null;
+    
+    try {
+      console.log('Fetching user document for:', firebaseUser.uid);
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        console.log('User data found:', userDoc.data());
+        // Convert Firestore timestamp to Date if needed
+        const userData = userDoc.data();
+        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
+          userData.createdAt = userData.createdAt.toDate();
+        }
+        return userData as UserData;
+      } else {
+        console.log('No user document found, creating basic profile');
+        // Create basic user profile if Firestore doesn't have data
+        const basicUserData: UserData = {
+          email: firebaseUser.email!,
+          username: firebaseUser.displayName || "User",
+          level: 1,
+          exp: 0,
+          totalWorkoutSeconds: 0,
+          createdAt: new Date(),
+          photoURL: firebaseUser.photoURL || undefined
+        };
+
+        // Save user profile to Firestore
+        await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
+        console.log('Created new user profile in Firestore');
+        return basicUserData;
+      }
+    } catch (err) {
+      console.error('Error processing user data:', err);
+      throw err;
+    }
+  };
+
+  // Set up a query to refetch user data when needed
+  const { data: userData, refetch: refetchUserData } = useQuery({
+    queryKey: ["auth", firebaseUser?.uid],
+    queryFn: async () => {
+      if (!firebaseUser) return null;
+      return fetchUserData(firebaseUser);
+    },
+    enabled: !!firebaseUser,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Update the user state when userData changes
+  useEffect(() => {
+    if (userData) {
+      setUser(userData);
+    }
+  }, [userData]);
+
   useEffect(() => {
     console.log('Setting up auth state listener');
     setIsLoading(true);
@@ -142,49 +202,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         if (firebaseUser) {
-          // Get user data from Firestore with better error handling
-          try {
-            console.log('Fetching user document for:', firebaseUser.uid);
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-              console.log('User data found:', userDoc.data());
-              // Convert Firestore timestamp to Date if needed
-              const userData = userDoc.data();
-              if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
-                userData.createdAt = userData.createdAt.toDate();
-              }
-              setUser(userData as UserData);
-            } else {
-              console.log('No user document found, creating basic profile');
-              // Create basic user profile if Firestore doesn't have data
-              const basicUserData: UserData = {
-                email: firebaseUser.email!,
-                username: firebaseUser.displayName || "User",
-                level: 1,
-                exp: 0,
-                totalWorkoutSeconds: 0,
-                createdAt: new Date(),
-                photoURL: firebaseUser.photoURL || undefined
-              };
-
-              // Save user profile to Firestore
-              try {
-                await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
-                console.log('Created new user profile in Firestore');
-                setUser(basicUserData);
-              } catch (err) {
-                console.error('Error creating user profile:', err);
-              }
-            }
-          } catch (err) {
-            console.error('Error fetching user data:', err);
-          }
+          // Instead of doing the fetch here, trigger the query
+          const userData = await fetchUserData(firebaseUser);
+          setUser(userData);
         } else {
           console.log('No firebase user');
           setUser(null);
         }
+      } catch (err) {
+        console.error('Error in auth state change handler:', err);
       } finally {
         setIsLoading(false);
       }
@@ -200,6 +226,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Function to refresh user data
+  const refreshUserData = async () => {
+    if (firebaseUser) {
+      try {
+        const freshUserData = await fetchUserData(firebaseUser);
+        setUser(freshUserData);
+      } catch (err) {
+        console.error('Error refreshing user data:', err);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -208,7 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         googleLoginMutation,
-        logoutMutation
+        logoutMutation,
+        refreshUserData
       }}
     >
       {children}

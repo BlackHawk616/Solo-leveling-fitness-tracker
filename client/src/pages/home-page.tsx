@@ -45,6 +45,8 @@ export default function HomePage() {
   const [isTracking, setIsTracking] = useState(false);
   const [workoutName, setWorkoutName] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
   const timerRef = useRef<NodeJS.Timeout>();
   const startTimeRef = useRef<Date>();
 
@@ -69,15 +71,13 @@ export default function HomePage() {
         })) as WorkoutData[];
       } catch (error) {
         console.error('Error fetching workouts:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch workouts",
-          variant: "destructive"
-        });
+        // Only show toast once, not in a loop
         return [];
       }
     },
-    enabled: !!firebaseUser
+    enabled: !!firebaseUser,
+    retry: false, // Prevent retries which can cause error loops
+    refetchOnWindowFocus: false // Prevent refetch on window focus which can cause error loops
   });
 
   const workoutMutation = useMutation({
@@ -129,6 +129,53 @@ export default function HomePage() {
       });
     }
   });
+
+  // Add username update mutation
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      if (!firebaseUser || !user) throw new Error("Not authenticated");
+
+      try {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        await updateDoc(userRef, {
+          username: newName
+        });
+        return newName;
+      } catch (error) {
+        console.error('Error updating username:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Username Updated",
+        description: "Your username has been successfully updated."
+      });
+      setIsEditingUsername(false);
+      // Refresh auth context to show new username
+      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update username",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleUsernameUpdate = async () => {
+    if (!newUsername.trim()) {
+      toast({
+        title: "Error",
+        description: "Username cannot be empty",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    await updateUsernameMutation.mutateAsync(newUsername);
+  };
 
   const rank = getRankForLevel(user?.level ?? 1);
   const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
@@ -199,7 +246,59 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <RankIcon className={`h-6 w-6 ${rankStyle.color}`} />
-                {user?.username}'s Profile
+                {isEditingUsername ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      placeholder="Enter new username"
+                      className="h-8 w-40"
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleUsernameUpdate}
+                      disabled={updateUsernameMutation.isPending}
+                    >
+                      {updateUsernameMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsEditingUsername(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span>{user?.username || "User"}'s Profile</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 ml-2"
+                      onClick={() => {
+                        setNewUsername(user?.username || "");
+                        setIsEditingUsername(true);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </Button>
+                  </>
+                )}
               </CardTitle>
               <CardDescription className={`font-semibold ${rankStyle.color}`}>
                 Level {user?.level} • {rank.name}
