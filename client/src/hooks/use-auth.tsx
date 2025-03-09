@@ -114,25 +114,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(null);
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
-        window.location.href = '/';
         return user;
       } catch (err) {
         console.error('Google sign-in error:', err);
         const firebaseError = err as { code?: string, message: string };
         let errorMessage = 'Failed to sign in with Google';
 
-        if (firebaseError.code === 'auth/popup-closed-by-user') {
+        // Add specific error messages for domain-related issues
+        if (firebaseError.code === 'auth/unauthorized-domain') {
+          errorMessage = 'This domain is not authorized for authentication. Please ensure it has been added to Firebase Console.';
+        } else if (firebaseError.code === 'auth/popup-closed-by-user') {
           errorMessage = 'Sign-in was cancelled';
         }
 
         throw new Error(errorMessage);
       }
     },
-    onSuccess: () => {
+    onSuccess: (user) => {
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
+      // Only redirect after successful authentication
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       toast({
