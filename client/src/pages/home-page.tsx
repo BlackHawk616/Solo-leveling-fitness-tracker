@@ -19,7 +19,24 @@ import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
 import type { WorkoutData, Workout } from "@/lib/firebase";
 
-// Update the workout type annotation
+// Move rankStyles definition to the top level
+const rankStyles = {
+  "E Rank": { icon: Shield, color: "text-gray-400", bg: "bg-gray-400/10" },
+  "D Rank": { icon: Shield, color: "text-bronze-400", bg: "bg-bronze-400/10" },
+  "C Rank": { icon: Shield, color: "text-green-400", bg: "bg-green-400/10" },
+  "B Rank": { icon: Shield, color: "text-blue-400", bg: "bg-blue-400/10" },
+  "A Rank": { icon: Star, color: "text-yellow-400", bg: "bg-yellow-400/10" },
+  "S Rank": { icon: Award, color: "text-purple-400", bg: "bg-purple-400/10" },
+  "National Level": { icon: Swords, color: "text-red-400", bg: "bg-red-400/10" },
+  "Mid Tier Monarch": { icon: Crown, color: "text-pink-400", bg: "bg-pink-400/10" },
+  "Yogumunt": { icon: Zap, color: "text-indigo-400", bg: "bg-indigo-400/10" },
+  "Architect": { icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-400/10" },
+  "Amtares": { icon: Flame, color: "text-emerald-400", bg: "bg-emerald-400/10" },
+  "Ashborn": { icon: Gem, color: "text-orange-400", bg: "bg-orange-400/10" },
+  "Sung Jinwo": { icon: Diamond, color: "text-purple-600", bg: "bg-purple-600/20" }
+} as const;
+
+// Update workout type annotation
 type CurrentWorkout = {
   name: string;
   startTime: number;
@@ -352,22 +369,6 @@ export default function HomePage() {
   const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
   const rankStyle = rankStyles[rank.name];
   const RankIcon = rankStyle.icon;
-
-  const rankStyles = {
-    "E Rank": { icon: Shield, color: "text-gray-400", bg: "bg-gray-400/10" },
-    "D Rank": { icon: Shield, color: "text-bronze-400", bg: "bg-bronze-400/10" },
-    "C Rank": { icon: Shield, color: "text-green-400", bg: "bg-green-400/10" },
-    "B Rank": { icon: Shield, color: "text-blue-400", bg: "bg-blue-400/10" },
-    "A Rank": { icon: Star, color: "text-yellow-400", bg: "bg-yellow-400/10" },
-    "S Rank": { icon: Award, color: "text-purple-400", bg: "bg-purple-400/10" },
-    "National Level": { icon: Swords, color: "text-red-400", bg: "bg-red-400/10" },
-    "Mid Tier Monarch": { icon: Crown, color: "text-pink-400", bg: "bg-pink-400/10" },
-    "Yogumunt": { icon: Zap, color: "text-indigo-400", bg: "bg-indigo-400/10" },
-    "Architect": { icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-400/10" },
-    "Amtares": { icon: Flame, color: "text-emerald-400", bg: "bg-emerald-400/10" },
-    "Ashborn": { icon: Gem, color: "text-orange-400", bg: "bg-orange-400/10" },
-    "Sung Jinwo": { icon: Diamond, color: "text-purple-600", bg: "bg-purple-600/20" }
-  };
 
 
   return (
