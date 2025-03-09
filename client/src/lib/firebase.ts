@@ -93,3 +93,6 @@ export const signInWithGoogle = async () => {
     throw error;
   }
 };
+
+// Import the signInWithPopup function
+import { signInWithPopup } from 'firebase/auth';
