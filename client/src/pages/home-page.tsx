@@ -18,7 +18,7 @@ import { Timer, Trophy, History, Crown, Star, Shield, Award, Swords, Zap,
 import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
 import type { WorkoutData } from "@/lib/firebase";
 
 // Update rank icons mapping with more diverse icons
@@ -63,10 +63,15 @@ export default function HomePage() {
           limit(10)
         );
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as WorkoutData[];
+        return querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            startedAt: data.startedAt.toDate(),
+            endedAt: data.endedAt.toDate()
+          };
+        }) as WorkoutData[];
       } catch (error) {
         console.error('Error fetching workouts:', error);
         return [];
@@ -75,7 +80,7 @@ export default function HomePage() {
     enabled: !!firebaseUser && !!user,
   });
 
-  // Update username mutation
+  // Username update mutation
   const updateUsernameMutation = useMutation({
     mutationFn: async (newName: string) => {
       if (!user) throw new Error("Not authenticated");
@@ -104,26 +109,31 @@ export default function HomePage() {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
 
       try {
+        const now = new Date();
         const workout: WorkoutData = {
           userId: firebaseUser.uid,
           name: data.name,
           durationSeconds: data.durationSeconds,
-          startedAt: startTimeRef.current || new Date(),
-          endedAt: new Date()
+          startedAt: startTimeRef.current || now,
+          endedAt: now
         };
 
-        // Add workout to Firestore
-        const workoutRef = await addDoc(collection(db, "workouts"), workout);
+        // First, save the workout
+        const workoutRef = await addDoc(collection(db, "workouts"), {
+          ...workout,
+          startedAt: Timestamp.fromDate(workout.startedAt),
+          endedAt: Timestamp.fromDate(workout.endedAt)
+        });
 
         // Calculate experience gained
         const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
 
-        // Update user stats
+        // Then update user stats
         await updateUserProfile({
           exp: user.exp + expGained,
           totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + data.durationSeconds,
           level: calculateNewLevel(user.exp + expGained),
-          currentWorkout: null // Clear current workout
+          currentWorkout: null
         });
 
         return { workout: { ...workout, id: workoutRef.id }, expGained };

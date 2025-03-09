@@ -7,7 +7,7 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider
 } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import type { UserData } from "@/lib/firebase";
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userDoc.exists()) {
         const userData = userDoc.data() as UserData;
         // Convert Firestore timestamp to Date
-        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
+        if (userData.createdAt instanceof Timestamp) {
           userData.createdAt = userData.createdAt.toDate();
         }
         return userData;
@@ -60,7 +60,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           photoURL: firebaseUser.photoURL || undefined
         };
 
-        await setDoc(userDocRef, basicUserData);
+        await setDoc(userDocRef, {
+          ...basicUserData,
+          createdAt: Timestamp.fromDate(basicUserData.createdAt)
+        });
         return basicUserData;
       }
     } catch (err) {
@@ -75,7 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const userDocRef = doc(db, "users", firebaseUser.uid);
-      await updateDoc(userDocRef, data);
+
+      // Convert Date objects to Firestore Timestamps
+      const firestoreData = { ...data };
+      if (data.createdAt instanceof Date) {
+        firestoreData.createdAt = Timestamp.fromDate(data.createdAt);
+      }
+
+      await updateDoc(userDocRef, firestoreData);
 
       // Update local state
       setUser(prev => prev ? { ...prev, ...data } : null);
