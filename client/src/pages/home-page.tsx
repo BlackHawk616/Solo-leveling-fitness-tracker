@@ -144,33 +144,36 @@ export default function HomePage() {
         return;
       }
 
-      // Set up state in correct order
+      // First update all the state values
       setWorkoutName(name);
       startTimeRef.current = new Date(startTime);
-      setElapsedSeconds(savedSeconds);
-      
-      // Set tracking state last
-      setTimeout(() => {
-        setIsTracking(true);
-        
-        // Start a new timer with a delay to ensure state is updated
-        setTimeout(() => {
-          timerRef.current = setInterval(() => {
-            setElapsedSeconds(prev => {
-              const next = prev + 1;
-              // Stop at 6 hours
-              if (next >= 6 * 60 * 60) {
-                if (timerRef.current) {
-                  clearInterval(timerRef.current);
-                  setIsTracking(false);
-                }
-                return 6 * 60 * 60;
-              }
-              return next;
-            });
-          }, 1000);
-        }, 50);
-      }, 50);
+
+      // Calculate the current elapsed time (saved + time since last update)
+      const updatedElapsedSeconds = Math.min(
+        savedSeconds + Math.floor((now - startTime) / 1000) - Math.floor(savedSeconds),
+        6 * 60 * 60 // Cap at 6 hours
+      );
+
+      setElapsedSeconds(updatedElapsedSeconds);
+
+      // Start the timer after all state is set
+      setIsTracking(true);
+
+      // Use a single timer setup without nested timeouts
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => {
+          const next = prev + 1;
+          // Cap at 6 hours
+          if (next >= 6 * 60 * 60) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              setIsTracking(false);
+            }
+            return 6 * 60 * 60;
+          }
+          return next;
+        });
+      }, 1000);
     } catch (error) {
       console.error("Error restoring workout:", error);
       // Clear the corrupted workout data
@@ -261,11 +264,11 @@ export default function HomePage() {
 
     // Set tracking state first to update UI
     setIsTracking(true);
-    
+
     // Set the start time and reset elapsed seconds
     startTimeRef.current = new Date();
     setElapsedSeconds(0);
-    
+
     // Start the timer with a slight delay to ensure state is updated
     setTimeout(() => {
       timerRef.current = setInterval(() => {
@@ -289,11 +292,11 @@ export default function HomePage() {
   async function stopWorkout() {
     // Only proceed if we're actually tracking
     if (!isTracking) return;
-    
+
     // Capture the current elapsed seconds and workout name
     const finalElapsedSeconds = elapsedSeconds;
     const finalWorkoutName = workoutName;
-    
+
     // Clear the timer first
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -323,7 +326,7 @@ export default function HomePage() {
 
       // Clear the current workout
       await updateUserProfile({ currentWorkout: null });
-      
+
       // Reset workout name after successful save
       setWorkoutName("");
     } catch (error) {
