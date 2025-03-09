@@ -129,11 +129,78 @@ export default function HomePage() {
     }
   });
 
+  // Restore timer state on mount
+  useEffect(() => {
+    if (!user?.currentWorkout || isTracking) return;
+
+    const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
+
+    // Calculate actual elapsed time including any time that passed while the page was closed
+    const now = Date.now();
+    const timeDiff = now - startTime;
+
+    // If more than 6 hours have passed, don't restore the timer
+    if (timeDiff > 6 * 60 * 60 * 1000) {
+      // Clear the current workout as it's expired
+      updateUserProfile({ currentWorkout: null }).catch(console.error);
+      return;
+    }
+
+    // Calculate additional seconds, ensuring we don't exceed the daily limit
+    const additionalSeconds = Math.min(
+      Math.floor(timeDiff / 1000),
+      6 * 60 * 60 - savedSeconds // Ensure we don't exceed 6 hours
+    );
+
+    const totalElapsedSeconds = Math.min(
+      savedSeconds + additionalSeconds,
+      6 * 60 * 60 // Maximum 6 hours
+    );
+
+    setWorkoutName(name);
+    startTimeRef.current = new Date(startTime);
+    setElapsedSeconds(totalElapsedSeconds);
+    setIsTracking(true);
+
+    // Resume timer
+    timerRef.current = setInterval(() => {
+      setElapsedSeconds(prev => {
+        const next = prev + 1;
+        // Stop timer if we reach 6 hours
+        if (next >= 6 * 60 * 60) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
+          setIsTracking(false);
+          return 6 * 60 * 60;
+        }
+        return next;
+      });
+    }, 1000);
+
+    // Cleanup
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [user?.currentWorkout, updateUserProfile]);
+
   // Save timer state periodically
   useEffect(() => {
     if (!isTracking || !startTimeRef.current) return;
 
     const saveTimerState = async () => {
+      if (elapsedSeconds >= 6 * 60 * 60) {
+        // Stop tracking if we hit the limit
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        setIsTracking(false);
+        await updateUserProfile({ currentWorkout: null });
+        return;
+      }
+
       try {
         await updateUserProfile({
           currentWorkout: {
@@ -153,28 +220,6 @@ export default function HomePage() {
     const saveInterval = setInterval(saveTimerState, 5000);
     return () => clearInterval(saveInterval);
   }, [isTracking, workoutName, elapsedSeconds, updateUserProfile]);
-
-  // Restore timer state on mount
-  useEffect(() => {
-    if (!user?.currentWorkout || isTracking) return;
-
-    const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
-
-    // Calculate actual elapsed time including any time that passed while the page was closed
-    const now = Date.now();
-    const additionalSeconds = Math.floor((now - startTime) / 1000);
-    const totalElapsedSeconds = savedSeconds + additionalSeconds;
-
-    setWorkoutName(name);
-    startTimeRef.current = new Date(startTime);
-    setElapsedSeconds(totalElapsedSeconds);
-    setIsTracking(true);
-
-    // Resume timer
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
-  }, [user?.currentWorkout]);
 
   // Cleanup timer
   useEffect(() => {
