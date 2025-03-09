@@ -19,6 +19,18 @@ import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
 import type { WorkoutData } from "@/lib/firebase";
 
+// Update the workout type annotation
+type CurrentWorkout = {
+  name: string;
+  startTime: number;
+  elapsedSeconds: number;
+} | null;
+
+// Update the currentWorkout property in updateUserProfile calls
+async function updateCurrentWorkout(workout: CurrentWorkout) {
+  await updateUserProfile({ currentWorkout: workout });
+}
+
 // Rank icons mapping with diverse icons
 const rankStyles = {
   "E Rank": { icon: Shield, color: "text-gray-400", bg: "bg-gray-400/10" },
@@ -131,7 +143,6 @@ export default function HomePage() {
 
   // Restore timer state on mount
   useEffect(() => {
-    // Only attempt to restore if we have a current workout and not already tracking
     if (!user?.currentWorkout || isTracking) return;
 
     try {
@@ -140,7 +151,7 @@ export default function HomePage() {
 
       // Don't restore if more than 6 hours old
       if (now - startTime > 6 * 60 * 60 * 1000) {
-        updateUserProfile({ currentWorkout: null }).catch(console.error);
+        updateCurrentWorkout(null).catch(console.error);
         return;
       }
 
@@ -177,7 +188,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error restoring workout:", error);
       // Clear the corrupted workout data
-      updateUserProfile({ currentWorkout: null }).catch(console.error);
+      updateCurrentWorkout(null).catch(console.error);
     }
 
     return () => {
@@ -200,16 +211,14 @@ export default function HomePage() {
             clearInterval(timerRef.current);
           }
           setIsTracking(false);
-          await updateUserProfile({ currentWorkout: null });
+          await updateCurrentWorkout(null);
           return;
         }
 
-        await updateUserProfile({
-          currentWorkout: {
-            name: workoutName,
-            startTime: startTimeRef.current!.getTime(),
-            elapsedSeconds
-          }
+        await updateCurrentWorkout({
+          name: workoutName,
+          startTime: startTimeRef.current!.getTime(),
+          elapsedSeconds
         });
       } catch (error) {
         console.error('Failed to save timer state:', error);
@@ -325,13 +334,12 @@ export default function HomePage() {
       });
 
       // Clear the current workout
-      await updateUserProfile({ currentWorkout: null });
+      await updateCurrentWorkout(null);
 
       // Reset workout name after successful save
       setWorkoutName("");
     } catch (error) {
       console.error("Failed to save workout:", error);
-      // Don't restore tracking state on error, just show an error message
       toast({
         title: "Error saving workout",
         description: "Please try again",
@@ -469,8 +477,8 @@ export default function HomePage() {
                     {isTracking ? formatDuration(elapsedSeconds) : "0s"}
                   </div>
                   {!isTracking ? (
-                    <Button 
-                      onClick={startWorkout} 
+                    <Button
+                      onClick={startWorkout}
                       variant="default"
                       className="w-full bg-gradient-to-r from-primary to-purple-600"
                       disabled={workoutMutation.isPending}
@@ -478,8 +486,8 @@ export default function HomePage() {
                       Start Workout
                     </Button>
                   ) : (
-                    <Button 
-                      onClick={stopWorkout} 
+                    <Button
+                      onClick={stopWorkout}
                       variant="destructive"
                       className="w-full"
                       disabled={workoutMutation.isPending}
