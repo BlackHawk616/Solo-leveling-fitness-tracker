@@ -6,6 +6,7 @@ import * as schema from "@shared/schema";
 neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is not set');
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
@@ -13,10 +14,13 @@ if (!process.env.DATABASE_URL) {
 
 // Validate that the DATABASE_URL has sslmode=require
 if (!process.env.DATABASE_URL.includes('sslmode=require')) {
+  console.error('DATABASE_URL must include sslmode=require');
   throw new Error(
     "DATABASE_URL must include '?sslmode=require' for secure connections.",
   );
 }
+
+console.log('Attempting to connect to database...');
 
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
@@ -29,6 +33,7 @@ pool.connect().then(() => {
   console.log('Successfully connected to the database');
 }).catch((err) => {
   console.error('Failed to connect to the database:', err.message);
+  console.error('Please check your DATABASE_URL configuration');
   throw err;
 });
 

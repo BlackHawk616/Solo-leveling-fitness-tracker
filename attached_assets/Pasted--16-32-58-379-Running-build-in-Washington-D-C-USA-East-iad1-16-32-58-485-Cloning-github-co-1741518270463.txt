@@ -1,0 +1,31 @@
+[16:32:58.379] Running build in Washington, D.C., USA (East) – iad1
+[16:32:58.485] Cloning github.com/BlackHawk616/Fitness-Leveling (Branch: main, Commit: 840df4f)
+[16:32:58.620] Previous build caches not available
+[16:32:59.406] Cloning completed: 920.000ms
+[16:33:00.223] Running "vercel build"
+[16:33:00.712] Vercel CLI 41.2.2
+[16:33:00.825] WARN! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
+[16:33:01.739] Installing dependencies...
+[16:33:07.235] npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+[16:33:07.236] npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+[16:33:15.406] 
+[16:33:15.407] added 558 packages in 13s
+[16:33:15.408] 
+[16:33:15.408] 60 packages are looking for funding
+[16:33:15.409]   run `npm fund` for details
+[16:33:15.696] Using TypeScript 5.6.3 (local user-provided)
+[16:33:20.736] server/routes.ts(19,11): error TS2353: Object literal may only specify known properties, and 'photoURL' does not exist in type '{ username: string; email: string; }'.
+[16:33:20.737] 
+[16:33:20.853] server/vite.ts(42,5): error TS2322: Type '{ middlewareMode: boolean; hmr: { server: Server<typeof IncomingMessage, typeof ServerResponse>; }; allowedHosts: boolean; }' is not assignable to type 'ServerOptions'.
+[16:33:20.854]   Types of property 'allowedHosts' are incompatible.
+[16:33:20.854]     Type 'boolean' is not assignable to type 'true | string[] | undefined'.
+[16:33:20.854] 
+[16:33:27.064] client/src/pages/home-page.tsx(31,9): error TS2304: Cannot find name 'updateUserProfile'.
+[16:33:27.064] client/src/pages/home-page.tsx(522,29): error TS7006: Parameter 'workout' implicitly has an 'any' type.
+[16:33:27.065] 
+[16:33:38.655] Build Completed in /vercel/output [37s]
+[16:33:39.121] Deploying outputs...
+[16:33:46.612] 
+[16:33:47.295] Deployment completed
+[16:33:57.599] Uploading build cache [58.78 MB]...
+[16:33:58.652] Build cache uploaded: 1.053s

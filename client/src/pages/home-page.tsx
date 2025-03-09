@@ -17,7 +17,7 @@ import { Timer, Trophy, History, Crown, Star, Shield, Award, Swords, Zap,
   Flame, Sparkles, Gem, Diamond } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
-import type { WorkoutData } from "@/lib/firebase";
+import type { WorkoutData, Workout } from "@/lib/firebase";
 
 // Update the workout type annotation
 type CurrentWorkout = {
@@ -28,7 +28,14 @@ type CurrentWorkout = {
 
 // Update the currentWorkout property in updateUserProfile calls
 async function updateCurrentWorkout(workout: CurrentWorkout) {
-  await updateUserProfile({ currentWorkout: workout });
+  if (!firebaseUser?.uid) return;
+  await fetch(`/api/users/${firebaseUser.uid}/current-workout`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ workout })
+  });
 }
 
 // Rank icons mapping with diverse icons
@@ -519,7 +526,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {workouts.map(workout => (
+              {workouts.map((workout: Workout) => (
                 <div
                   key={workout.id}
                   className="flex items-center justify-between p-4 bg-primary/5 rounded-lg"

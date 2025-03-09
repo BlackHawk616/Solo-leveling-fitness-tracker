@@ -4,10 +4,23 @@ import { storage } from "./storage";
 import { insertWorkoutSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // User routes
+  // Temporary debug endpoint - REMOVE AFTER DEPLOYMENT DEBUG
+  app.get("/api/debug-env", (req, res) => {
+    const hasDbUrl = !!process.env.DATABASE_URL;
+    const dbUrlLength = process.env.DATABASE_URL?.length || 0;
+    const hasSslMode = process.env.DATABASE_URL?.includes('sslmode=require');
+
+    res.json({
+      hasDbUrl,
+      dbUrlLength,
+      hasSslMode,
+      message: "Database configuration debug info"
+    });
+  });
+
   app.post("/api/users", async (req, res) => {
     try {
-      const { firebaseId, email, username, photoURL } = req.body;
+      const { firebaseId, email, username } = req.body;
       const existingUser = await storage.getUserByFirebaseId(firebaseId);
 
       if (existingUser) {
@@ -15,8 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         const user = await storage.createUser(firebaseId, {
           email,
-          username,
-          photoURL
+          username
         });
         res.status(201).json(user);
       }

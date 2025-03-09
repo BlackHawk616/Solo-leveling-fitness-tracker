@@ -23,8 +23,5 @@
       "src": "/(.*)",
       "dest": "client/index.html"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database_url"
-  }
+  ]
 }
