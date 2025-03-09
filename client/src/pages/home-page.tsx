@@ -327,9 +327,13 @@ export default function HomePage() {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
     }
-
-    // Stop tracking immediately to update UI
+    
+    // Immediately set tracking to false to update UI
     setIsTracking(false);
+    // Reset elapsed seconds
+    setElapsedSeconds(0);
+    // Reset start time reference
+    startTimeRef.current = undefined;
 
     // Don't submit if elapsed time is too short
     if (finalElapsedSeconds < 1) {
