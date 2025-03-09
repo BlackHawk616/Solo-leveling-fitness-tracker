@@ -22,19 +22,40 @@ if (!process.env.DATABASE_URL.includes('sslmode=require')) {
 
 console.log('Attempting to connect to database...');
 
+// Create a pooled connection URL for better connection management
+let poolUrl = process.env.DATABASE_URL;
+if (!poolUrl.includes('-pooler.')) {
+  poolUrl = poolUrl.replace('.us-east-2', '-pooler.us-east-2');
+}
+
 export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 8000, // 8 second timeout
-  max: 20 // Maximum number of clients in the pool
+  connectionString: poolUrl,
+  connectionTimeoutMillis: 10000, // Increased timeout
+  max: 10, // Reduced max connections
+  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+  allowExitOnIdle: true // Allow pool to exit when there are no connections
 });
 
 // Test the connection on startup
-pool.connect().then(() => {
+pool.connect().then((client) => {
   console.log('Successfully connected to the database');
+  client.release(); // Important: release the client back to the pool
 }).catch((err) => {
   console.error('Failed to connect to the database:', err.message);
   console.error('Please check your DATABASE_URL configuration');
   throw err;
 });
 
+// Create the drizzle client with the pool
 export const db = drizzle({ client: pool, schema });
+
+// Handle process termination gracefully
+process.on('SIGTERM', () => {
+  console.log('Closing database pool...');
+  pool.end();
+});
+
+process.on('SIGINT', () => {
+  console.log('Closing database pool...');
+  pool.end();
+});
