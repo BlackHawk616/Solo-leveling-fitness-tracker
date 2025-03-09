@@ -91,10 +91,32 @@ export { auth, db, storage, googleProvider, facebookProvider, twitterProvider };
 // Helper function for Google sign-in
 export const signInWithGoogle = async () => {
   try {
+    // Ensure we're not in a mobile iframe context that would block popups
+    if (window.self !== window.top) {
+      // If in iframe, open in new window
+      window.open('/auth', '_blank');
+      return null;
+    }
+    
     const result = await signInWithPopup(auth, googleProvider);
+    console.log("Google sign-in successful:", result.user.displayName);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error signing in with Google:", error);
+    
+    // Log detailed error information for debugging
+    console.log("Error name:", error.name);
+    console.log("Error message:", error.message);
+    
+    if (error.code) {
+      console.log("Firebase error code:", error.code);
+      
+      // Special handling for popup blocked
+      if (error.code === 'auth/popup-blocked') {
+        alert('Popup was blocked. Please allow popups for this site and try again.');
+      }
+    }
+    
     throw error;
   }
 };

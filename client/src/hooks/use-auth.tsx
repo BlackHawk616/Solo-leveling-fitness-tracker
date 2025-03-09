@@ -58,6 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The signed-in user info
         const user = result.user;
         console.log('Google login successful for user:', user.uid);
+        
+        // Navigate to home page after successful login
+        window.location.href = '/';
+        return user;
 
         return user;
       } catch (err) {
