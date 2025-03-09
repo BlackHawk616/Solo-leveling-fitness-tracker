@@ -91,6 +91,11 @@ export { auth, db, storage, googleProvider, facebookProvider, twitterProvider };
 // Helper function for Google sign-in
 export const signInWithGoogle = async () => {
   try {
+    // Set additional parameters for better auth flow
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
     // Ensure we're not in a mobile iframe context that would block popups
     if (window.self !== window.top) {
       // If in iframe, open in new window
@@ -98,8 +103,19 @@ export const signInWithGoogle = async () => {
       return null;
     }
     
+    console.log("Starting Google sign-in popup...");
     const result = await signInWithPopup(auth, googleProvider);
     console.log("Google sign-in successful:", result.user.displayName);
+    
+    // Trigger refresh to ensure auth state is updated
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        console.log("Auth state confirmed after login:", user.uid);
+        // Force navigation after confirmed auth state change
+        window.location.href = '/';
+      }
+    });
+    
     return result.user;
   } catch (error: any) {
     console.error("Error signing in with Google:", error);

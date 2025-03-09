@@ -62,8 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Navigate to home page after successful login
         window.location.href = '/';
         return user;
-
-        return user;
       } catch (err) {
         console.error('Google sign-in error:', err);
         // More detailed error logging

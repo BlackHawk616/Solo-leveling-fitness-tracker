@@ -14,8 +14,14 @@ export default function AuthPage() {
     return <Redirect to="/" />;
   }
 
-  const handleGoogleLogin = () => {
-    googleLoginMutation.mutate();
+  const handleGoogleLogin = async () => {
+    try {
+      await googleLoginMutation.mutateAsync();
+      // After successful login, explicitly redirect
+      window.location.href = '/';
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
   };
 
   return (

@@ -1,33 +1,37 @@
+import { Route, RouteProps, Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
-import { Redirect, Route } from "wouter";
+
+type ProtectedRouteProps = RouteProps & {
+  component: React.ComponentType<any>;
+};
 
 export function ProtectedRoute({
-  path,
   component: Component,
-}: {
-  path: string;
-  component: () => React.JSX.Element;
-}) {
-  const { user, isLoading } = useAuth();
+  ...rest
+}: ProtectedRouteProps) {
+  const { user, firebaseUser, isLoading } = useAuth();
 
-  if (isLoading) {
-    return (
-      <Route path={path}>
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-border" />
-        </div>
-      </Route>
-    );
-  }
+  return (
+    <Route
+      {...rest}
+      component={(props: any) => {
+        if (isLoading) {
+          return (
+            <div className="flex items-center justify-center min-h-screen">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading your profile...</span>
+            </div>
+          );
+        }
 
-  if (!user) {
-    return (
-      <Route path={path}>
-        <Redirect to="/auth" />
-      </Route>
-    );
-  }
+        if (!user && !firebaseUser) {
+          console.log("Protected route: No user found, redirecting to auth");
+          return <Redirect to="/auth" />;
+        }
 
-  return <Component />
+        return <Component {...props} />;
+      }}
+    />
+  );
 }
