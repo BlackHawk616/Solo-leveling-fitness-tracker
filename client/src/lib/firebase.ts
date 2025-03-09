@@ -46,6 +46,12 @@ const twitterProvider = new TwitterAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
+// Set custom parameters for better mobile experience and add Replit domain
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+  login_hint: 'user@example.com'
+});
+
 // Add error handler to auth
 auth.onAuthStateChanged((user) => {
   if (user) {
