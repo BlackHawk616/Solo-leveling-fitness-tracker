@@ -7,7 +7,7 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,6 +19,12 @@ type UserData = {
   totalWorkoutSeconds: number;
   createdAt: Date;
   photoURL?: string;
+  lastWorkoutTimestamp?: number;
+  currentWorkout?: {
+    name: string;
+    startTime: number;
+    elapsedSeconds: number;
+  };
 };
 
 type AuthContextType = {
@@ -29,6 +35,7 @@ type AuthContextType = {
   googleLoginMutation: any;
   logoutMutation: any;
   refreshUserData: () => Promise<void>;
+  updateUserProfile: (data: Partial<UserData>) => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -41,68 +48,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Define mutations first, then use them in the provider value
+  // Function to fetch user data
+  const fetchUserData = async (firebaseUser: FirebaseUser) => {
+    if (!firebaseUser) return null;
+
+    try {
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        // Convert Firestore timestamp to Date
+        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
+          userData.createdAt = userData.createdAt.toDate();
+        }
+        return userData as UserData;
+      } else {
+        // Create basic user profile
+        const basicUserData: UserData = {
+          email: firebaseUser.email!,
+          username: firebaseUser.displayName || "User",
+          level: 1,
+          exp: 0,
+          totalWorkoutSeconds: 0,
+          createdAt: new Date(),
+          photoURL: firebaseUser.photoURL || undefined
+        };
+
+        await setDoc(userDocRef, basicUserData);
+        return basicUserData;
+      }
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+      throw err;
+    }
+  };
+
+  // Update user profile function
+  const updateUserProfile = async (data: Partial<UserData>) => {
+    if (!firebaseUser || !user) throw new Error("Not authenticated");
+
+    try {
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      await updateDoc(userDocRef, data);
+
+      // Update local state
+      setUser(prev => prev ? { ...prev, ...data } : null);
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been successfully updated.",
+      });
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      throw err;
+    }
+  };
+
   const googleLoginMutation = useMutation({
     mutationFn: async () => {
-      console.log('Attempting Google Sign-in');
       try {
-        // Clear any previous errors
         setError(null);
-
-        // Sign in with Google popup
         const result = await signInWithPopup(auth, googleProvider);
-
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-
-        // The signed-in user info
         const user = result.user;
-        console.log('Google login successful for user:', user.uid);
-
-        // Navigate to home page after successful login
         window.location.href = '/';
         return user;
       } catch (err) {
         console.error('Google sign-in error:', err);
-        // More detailed error logging
-        if (err instanceof Error) {
-          console.error('Error name:', err.name);
-          console.error('Error message:', err.message);
-        }
-
         const firebaseError = err as { code?: string, message: string };
-        console.error('Firebase error code:', firebaseError.code);
+        let errorMessage = 'Failed to sign in with Google';
 
-        // Set a more user-friendly error message based on Firebase error codes
-        let errorMessage = firebaseError.message;
         if (firebaseError.code === 'auth/popup-closed-by-user') {
-          errorMessage = 'Sign-in popup was closed before completing the login process';
-        } else if (firebaseError.code === 'auth/cancelled-popup-request') {
-          errorMessage = 'Multiple popup requests were triggered. Only the latest will be displayed';
-        } else if (firebaseError.code === 'auth/popup-blocked') {
-          errorMessage = 'The popup was blocked by the browser. Please check your popup settings';
-        } else if (firebaseError.code === 'auth/api-key-not-valid') {
-          errorMessage = 'Firebase API key is invalid. Check your environment variables';
-        } else if (firebaseError.code === 'auth/invalid-api-key') {
-          errorMessage = 'Firebase API key is invalid. Check your environment variables';
-        } else if (firebaseError.code === 'auth/configuration-not-found') {
-          errorMessage = 'Firebase configuration is missing or incorrect';
+          errorMessage = 'Sign-in was cancelled';
         }
 
-        setError(new Error(errorMessage));
         throw new Error(errorMessage);
       }
     },
-    onSuccess: (user) => {
-      console.log('Google login mutation successful, user:', user.uid);
+    onSuccess: () => {
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
     },
     onError: (error: Error) => {
-      console.log('Google login mutation error handler:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
@@ -116,15 +148,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut(auth);
     },
     onSuccess: () => {
-      console.log('Logged out successfully');
       queryClient.clear();
+      setUser(null);
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",
       });
     },
     onError: (error: Error) => {
-      console.error('Logout error:', error);
       toast({
         variant: "destructive",
         title: "Logout failed",
@@ -133,108 +164,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  // Function to fetch user data that can be called to refresh user data
-  const fetchUserData = async (firebaseUser: FirebaseUser) => {
-    if (!firebaseUser) return null;
-
-    try {
-      console.log('Fetching user document for:', firebaseUser.uid);
-      const userDocRef = doc(db, "users", firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        console.log('User data found:', userDoc.data());
-        // Convert Firestore timestamp to Date if needed
-        const userData = userDoc.data();
-        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
-          userData.createdAt = userData.createdAt.toDate();
-        }
-        return userData as UserData;
-      } else {
-        console.log('No user document found, creating basic profile');
-        // Create basic user profile if Firestore doesn't have data
-        const basicUserData: UserData = {
-          email: firebaseUser.email!,
-          username: firebaseUser.displayName || "User",
-          level: 1,
-          exp: 0,
-          totalWorkoutSeconds: 0,
-          createdAt: new Date(),
-          photoURL: firebaseUser.photoURL || undefined
-        };
-
-        // Save user profile to Firestore
-        await setDoc(doc(db, "users", firebaseUser.uid), basicUserData);
-        console.log('Created new user profile in Firestore');
-        return basicUserData;
-      }
-    } catch (err) {
-      console.error('Error processing user data:', err);
-      throw err;
-    }
-  };
-
-  // Set up a query to refetch user data when needed
-  const { data: userData, refetch: refetchUserData } = useQuery({
-    queryKey: ["auth", firebaseUser?.uid],
-    queryFn: async () => {
-      if (!firebaseUser) return null;
-      return fetchUserData(firebaseUser);
-    },
-    enabled: !!firebaseUser,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Update the user state when userData changes
+  // Auth state listener
   useEffect(() => {
-    if (userData) {
-      setUser(userData);
-    }
-  }, [userData]);
-
-  useEffect(() => {
-    console.log('Setting up auth state listener');
-    setIsLoading(true);
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser?.email);
-      setFirebaseUser(firebaseUser);
-
       try {
+        setFirebaseUser(firebaseUser);
+
         if (firebaseUser) {
-          // Instead of doing the fetch here, trigger the query
           const userData = await fetchUserData(firebaseUser);
           setUser(userData);
         } else {
-          console.log('No firebase user');
           setUser(null);
         }
       } catch (err) {
-        console.error('Error in auth state change handler:', err);
+        console.error('Auth state change error:', err);
+        setError(err as Error);
       } finally {
         setIsLoading(false);
       }
-    }, (error) => {
-      console.error('Firebase auth state error:', error);
-      setIsLoading(false);
-      setError(error as Error);
     });
 
-    return () => {
-      console.log('Cleaning up auth state listener');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   // Function to refresh user data
   const refreshUserData = async () => {
-    if (firebaseUser) {
-      try {
-        const freshUserData = await fetchUserData(firebaseUser);
-        setUser(freshUserData);
-      } catch (err) {
-        console.error('Error refreshing user data:', err);
-      }
+    if (!firebaseUser) return;
+
+    try {
+      const freshUserData = await fetchUserData(firebaseUser);
+      setUser(freshUserData);
+    } catch (err) {
+      console.error('Error refreshing user data:', err);
+      throw err;
     }
   };
 
@@ -247,7 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         googleLoginMutation,
         logoutMutation,
-        refreshUserData
+        refreshUserData,
+        updateUserProfile
       }}
     >
       {children}

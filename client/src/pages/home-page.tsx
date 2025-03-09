@@ -21,6 +21,7 @@ import { playSuccessSound } from "@/lib/sounds";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, updateDoc } from "firebase/firestore";
 import { WorkoutData } from "@/lib/firebase";
+import { updateUserProfile } from "@/lib/user"; // Assuming this function exists
 
 // Update rank icons mapping with more diverse icons
 const rankStyles = {
@@ -83,6 +84,30 @@ export default function HomePage() {
     staleTime: 60000 // Data stays fresh for 1 minute
   });
 
+  // Update the updateUsernameMutation to use the new updateUserProfile function
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      if (!user) throw new Error("Not authenticated");
+      await updateUserProfile({ username: newName });
+      return newName;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Username Updated",
+        description: "Your username has been successfully updated."
+      });
+      setIsEditingUsername(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update username",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Update the workout mutation to properly handle Firebase persistence
   const workoutMutation = useMutation({
     mutationFn: async (data: { name: string, durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
@@ -98,19 +123,20 @@ export default function HomePage() {
 
         // Add workout to Firestore
         const workoutRef = await addDoc(collection(db, "workouts"), workout);
-        console.log('Workout saved:', workoutRef.id);
 
-        // Update user stats
-        const userRef = doc(db, "users", firebaseUser.uid);
+        // Calculate experience gained
         const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
 
-        await updateDoc(userRef, {
+        // Update user stats
+        await updateUserProfile({
           exp: user.exp + expGained,
           totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + data.durationSeconds,
-          level: calculateNewLevel(user.exp + expGained)
+          level: calculateNewLevel(user.exp + expGained),
+          currentWorkout: null, // Clear current workout
+          lastWorkoutTimestamp: Date.now()
         });
 
-        return { workout, expGained };
+        return { workout: { ...workout, id: workoutRef.id }, expGained };
       } catch (error) {
         console.error('Error saving workout:', error);
         throw error;
@@ -127,40 +153,6 @@ export default function HomePage() {
     onError: (error: Error) => {
       toast({
         title: "Failed to save workout",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Add username update mutation
-  const updateUsernameMutation = useMutation({
-    mutationFn: async (newName: string) => {
-      if (!firebaseUser || !user) throw new Error("Not authenticated");
-
-      try {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        await updateDoc(userRef, {
-          username: newName
-        });
-        return newName;
-      } catch (error) {
-        console.error('Error updating username:', error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      toast({
-        title: "Username Updated",
-        description: "Your username has been successfully updated."
-      });
-      setIsEditingUsername(false);
-      // Refresh auth context to show new username
-      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update username",
         description: error.message,
         variant: "destructive"
       });
@@ -185,6 +177,43 @@ export default function HomePage() {
   const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
   const rankStyle = rankStyles[rank.name];
   const RankIcon = rankStyle.icon;
+
+  // Add persistance for workout timer
+  useEffect(() => {
+    if (isTracking && user) {
+      // Save current workout state to Firebase
+      updateUserProfile({
+        currentWorkout: {
+          name: workoutName,
+          startTime: startTimeRef.current?.getTime() || Date.now(),
+          elapsedSeconds
+        }
+      }).catch(console.error);
+    }
+  }, [isTracking, elapsedSeconds, workoutName, user]);
+
+  // Restore workout state on component mount
+  useEffect(() => {
+    if (user?.currentWorkout) {
+      const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
+      setWorkoutName(name);
+      startTimeRef.current = new Date(startTime);
+      setElapsedSeconds(savedSeconds);
+      setIsTracking(true);
+
+      // Resume timer
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [user?.currentWorkout]);
+
 
   useEffect(() => {
     return () => {

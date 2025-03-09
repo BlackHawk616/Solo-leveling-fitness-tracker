@@ -1,7 +1,6 @@
-
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider, TwitterAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { initializeFirestore, enableIndexedDbPersistence, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
@@ -15,65 +14,33 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase with error handling
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-  console.log('Firebase app initialized successfully');
-} catch (error) {
-  console.error('Firebase initialization error:', error);
-  console.error('Firebase config issue. Check your environment variables and API keys.');
-}
-
-// Configure with better network timeout settings
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-auth.settings = { appVerificationDisabledForTesting: false };
 
-// Configure Firestore with better network settings
-const db = getFirestore(app);
+// Initialize Firestore with settings
+const db = initializeFirestore(app, {
+  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+});
+
 const storage = getStorage(app);
 
-// Add network connection timeout handler
-const networkTimeoutMs = 30000; // 30 seconds timeout
-
-// Enable offline persistence
-enableIndexedDbPersistence(db)
-  .then(() => {
-    console.log('Firebase persistence enabled');
-  })
-  .catch((err) => {
-    console.error('Firebase persistence error:', err);
-  });
-
-// Auth providers
-const googleProvider = new GoogleAuthProvider();
-const facebookProvider = new FacebookAuthProvider();
-const twitterProvider = new TwitterAuthProvider();
-
-// Add scopes for additional user info if needed
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-
-// Set custom parameters for better mobile experience and add Replit domain
-googleProvider.setCustomParameters({
-  prompt: 'select_account',
-  login_hint: 'user@example.com'
-});
-
-// Add error handler to auth
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    console.log('Firebase auth state changed - user is signed in:', user.uid);
-  } else {
-    console.log('Firebase auth state changed - user is signed out');
+// Configure Firestore for offline persistence and better caching
+enableIndexedDbPersistence(db, {
+  synchronizeTabs: true
+}).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('The current browser does not support persistence.');
   }
-}, (error) => {
-  console.error('Firebase auth state observer error:', error);
 });
 
-console.log('Firebase initialized successfully with config:', JSON.stringify({
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain
-}));
+
+// Auth providers setup
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // Helper types for data structure
 export interface UserData {
@@ -83,6 +50,13 @@ export interface UserData {
   exp: number;
   totalWorkoutSeconds: number;
   createdAt: Date;
+  photoURL?: string;
+  lastWorkoutTimestamp?: number;
+  currentWorkout?: {
+    name: string;
+    startTime: number;
+    elapsedSeconds: number;
+  };
 }
 
 export interface WorkoutData {
@@ -91,55 +65,7 @@ export interface WorkoutData {
   durationSeconds: number;
   startedAt: Date;
   endedAt: Date;
+  id?: string;
 }
 
-export { auth, db, storage, googleProvider, facebookProvider, twitterProvider };
-
-// Helper function for Google sign-in
-export const signInWithGoogle = async () => {
-  try {
-    // Set additional parameters for better auth flow
-    googleProvider.setCustomParameters({
-      prompt: 'select_account'
-    });
-    
-    // Ensure we're not in a mobile iframe context that would block popups
-    if (window.self !== window.top) {
-      // If in iframe, open in new window
-      window.open('/auth', '_blank');
-      return null;
-    }
-    
-    console.log("Starting Google sign-in popup...");
-    const result = await signInWithPopup(auth, googleProvider);
-    console.log("Google sign-in successful:", result.user.displayName);
-    
-    // Trigger refresh to ensure auth state is updated
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        console.log("Auth state confirmed after login:", user.uid);
-        // Force navigation after confirmed auth state change
-        window.location.href = '/';
-      }
-    });
-    
-    return result.user;
-  } catch (error: any) {
-    console.error("Error signing in with Google:", error);
-    
-    // Log detailed error information for debugging
-    console.log("Error name:", error.name);
-    console.log("Error message:", error.message);
-    
-    if (error.code) {
-      console.log("Firebase error code:", error.code);
-      
-      // Special handling for popup blocked
-      if (error.code === 'auth/popup-blocked') {
-        alert('Popup was blocked. Please allow popups for this site and try again.');
-      }
-    }
-    
-    throw error;
-  }
-};
+export { auth, db, storage, googleProvider };
