@@ -171,5 +171,5 @@ export class DatabaseStorage implements IStorage {
 export const storage = new DatabaseStorage();
 
 function calculateExpForLevel(level: number): number {
-  return Math.floor(Math.pow(level, 1.8) * 1000);
+  return level <= 200 ? 50000 : 100000;
 }

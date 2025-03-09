@@ -60,7 +60,7 @@ export const ranks = [
 ] as const;
 
 export function calculateExpForLevel(level: number): number {
-  return Math.floor(Math.pow(level, 1.8) * 1000);
+  return level <= 200 ? 50000 : 100000;
 }
 
 export function getRankForLevel(level: number) {
