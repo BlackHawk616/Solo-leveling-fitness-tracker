@@ -147,18 +147,27 @@ export default function HomePage() {
       }
     };
 
+    // Save immediately when starting
+    saveTimerState();
+
     const saveInterval = setInterval(saveTimerState, 5000);
     return () => clearInterval(saveInterval);
-  }, [isTracking, workoutName, elapsedSeconds]);
+  }, [isTracking, workoutName, elapsedSeconds, updateUserProfile]);
 
   // Restore timer state on mount
   useEffect(() => {
     if (!user?.currentWorkout || isTracking) return;
 
     const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
+
+    // Calculate actual elapsed time including any time that passed while the page was closed
+    const now = Date.now();
+    const additionalSeconds = Math.floor((now - startTime) / 1000);
+    const totalElapsedSeconds = savedSeconds + additionalSeconds;
+
     setWorkoutName(name);
     startTimeRef.current = new Date(startTime);
-    setElapsedSeconds(savedSeconds);
+    setElapsedSeconds(totalElapsedSeconds);
     setIsTracking(true);
 
     // Resume timer
