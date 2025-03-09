@@ -1,6 +1,8 @@
-import { User, Workout, InsertUser, InsertWorkout } from "@shared/schema";
+import { User, Workout, InsertUser, InsertWorkout, users, workouts } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { db } from "./db";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -23,103 +25,110 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private workouts: Map<string, Workout>;
-  private currentId: number;
+export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.workouts = new Map();
-    this.currentId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // 24 hours
     });
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByFirebaseId(firebaseId: string): Promise<User | undefined> {
-    // Since firebaseId is now our main user ID, this is the same as getUser
     return this.getUser(firebaseId);
   }
 
   async createUser(firebaseId: string, insertUser: InsertUser): Promise<User> {
-    const user: User = {
-      id: firebaseId, // Use firebaseId as the user ID
-      ...insertUser,
-      level: 1,
-      exp: 0,
-      totalWorkoutSeconds: 0,
-      currentWorkout: null
-    };
-    this.users.set(firebaseId, user);
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: firebaseId,
+        ...insertUser,
+        level: 1,
+        exp: 0,
+        totalWorkoutSeconds: 0
+      })
+      .returning();
     return user;
   }
 
   async updateUsername(userId: string, username: string): Promise<User> {
-    const user = await this.getUser(userId);
-    if (!user) throw new Error("User not found");
+    const [user] = await db
+      .update(users)
+      .set({ username })
+      .where(eq(users.id, userId))
+      .returning();
 
-    const updatedUser = {
-      ...user,
-      username
-    };
-    this.users.set(userId, updatedUser);
-    return updatedUser;
+    if (!user) throw new Error("User not found");
+    return user;
   }
 
   async updateUserExp(userId: string, expGained: number): Promise<User> {
-    const user = await this.getUser(userId);
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
     if (!user) throw new Error("User not found");
 
     const newExp = user.exp + expGained;
     let newLevel = user.level;
 
-    // Calculate level based on exp
     while (newExp >= calculateExpForLevel(newLevel)) {
       newLevel++;
     }
 
-    const updatedUser = {
-      ...user,
-      exp: newExp,
-      level: newLevel
-    };
-    this.users.set(userId, updatedUser);
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        exp: newExp,
+        level: newLevel
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
     return updatedUser;
   }
 
   async createWorkout(userId: string, workout: InsertWorkout): Promise<Workout> {
-    const workoutId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newWorkout: Workout = {
-      id: workoutId,
-      userId,
-      ...workout
-    };
-    this.workouts.set(workoutId, newWorkout);
+    const [newWorkout] = await db
+      .insert(workouts)
+      .values({
+        userId,
+        ...workout
+      })
+      .returning();
 
     // Update user's total workout seconds
-    const user = await this.getUser(userId);
-    if (user) {
-      const updatedUser = {
-        ...user,
-        totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + workout.durationSeconds
-      };
-      this.users.set(userId, updatedUser);
-    }
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) throw new Error("User not found");
+
+    await db
+      .update(users)
+      .set({
+        totalWorkoutSeconds: user.totalWorkoutSeconds + workout.durationSeconds
+      })
+      .where(eq(users.id, userId));
 
     return newWorkout;
   }
 
   async getWorkouts(userId: string): Promise<Workout[]> {
-    return Array.from(this.workouts.values())
-      .filter(workout => workout.userId === userId)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-      .slice(0, 10); // Limit to 10 entries
+    return db
+      .select()
+      .from(workouts)
+      .where(eq(workouts.userId, userId))
+      .orderBy(workouts.startedAt)
+      .limit(10);
   }
 
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {
@@ -129,13 +138,18 @@ export class MemStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return Array.from(this.workouts.values())
-      .filter(workout => 
-        workout.userId === userId &&
-        new Date(workout.startedAt) >= startOfDay &&
-        new Date(workout.startedAt) <= endOfDay
-      )
-      .reduce((acc, workout) => acc + workout.durationSeconds, 0);
+    const result = await db
+      .select({ total: workouts.durationSeconds })
+      .from(workouts)
+      .where(
+        and(
+          eq(workouts.userId, userId),
+          gte(workouts.startedAt, startOfDay),
+          lte(workouts.startedAt, endOfDay)
+        )
+      );
+
+    return result.reduce((acc, row) => acc + (row.total || 0), 0);
   }
 
   async updateUserCurrentWorkout(userId: string, workout: { 
@@ -143,19 +157,18 @@ export class MemStorage implements IStorage {
     startTime: number;
     elapsedSeconds: number;
   } | null): Promise<User> {
-    const user = await this.getUser(userId);
-    if (!user) throw new Error("User not found");
+    const [user] = await db
+      .update(users)
+      .set({ currentWorkout: workout })
+      .where(eq(users.id, userId))
+      .returning();
 
-    const updatedUser = {
-      ...user,
-      currentWorkout: workout
-    };
-    this.users.set(userId, updatedUser);
-    return updatedUser;
+    if (!user) throw new Error("User not found");
+    return user;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
 
 function calculateExpForLevel(level: number): number {
   return Math.floor(Math.pow(level, 1.8) * 1000);

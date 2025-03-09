@@ -1,20 +1,20 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  id: text("id").primaryKey(), // Changed to text for Firebase ID
+  email: text("email").notNull(),
   username: text("username").notNull(),
-  password: text("password").notNull(),
   level: integer("level").notNull().default(1),
   exp: integer("exp").notNull().default(0),
-  totalWorkoutSeconds: integer("total_workout_seconds").notNull().default(0)
+  totalWorkoutSeconds: integer("total_workout_seconds").notNull().default(0),
+  currentWorkout: jsonb("current_workout")
 });
 
 export const workouts = pgTable("workouts", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: text("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   durationSeconds: integer("duration_seconds").notNull(),
   startedAt: timestamp("started_at").notNull(),
@@ -24,19 +24,17 @@ export const workouts = pgTable("workouts", {
 export const insertUserSchema = createInsertSchema(users)
   .pick({
     email: true,
-    username: true,
-    password: true
+    username: true
   })
   .extend({
-    email: z.string().email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters")
+    email: z.string().email("Invalid email address")
   });
 
 export const insertWorkoutSchema = z.object({
   name: z.string().min(1, "Name is required"),
   durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
-  startedAt: z.string().transform(str => new Date(str)),
-  endedAt: z.string().transform(str => new Date(str)),
+  startedAt: z.coerce.date(),
+  endedAt: z.coerce.date(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -62,7 +60,7 @@ export const ranks = [
 ] as const;
 
 export function calculateExpForLevel(level: number): number {
-  return level <= 200 ? 50000 : 100000;
+  return Math.floor(Math.pow(level, 1.8) * 1000);
 }
 
 export function getRankForLevel(level: number) {
