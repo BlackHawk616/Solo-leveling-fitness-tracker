@@ -7,8 +7,7 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider
 } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import type { UserData } from "@/lib/firebase";
 
@@ -33,39 +32,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Function to fetch user data
+  // Function to fetch user data from our backend
   const fetchUserData = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) return null;
 
     try {
-      const userDocRef = doc(db, "users", firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firebaseId: firebaseUser.uid,
+          email: firebaseUser.email,
+          username: firebaseUser.displayName || 'User',
+          photoURL: firebaseUser.photoURL
+        })
+      });
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        // Convert Firestore timestamp to Date
-        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
-          userData.createdAt = userData.createdAt.toDate();
-        }
-        return userData as UserData;
-      } else {
-        // Create basic user profile
-        const basicUserData: UserData = {
-          email: firebaseUser.email!,
-          username: firebaseUser.displayName || "User",
-          level: 1,
-          exp: 0,
-          totalWorkoutSeconds: 0,
-          createdAt: new Date(),
-          photoURL: firebaseUser.photoURL || undefined
-        };
-
-        await setDoc(userDocRef, {
-          ...basicUserData,
-          createdAt: Timestamp.fromDate(basicUserData.createdAt)
-        });
-        return basicUserData;
-      }
+      if (!response.ok) throw new Error('Failed to fetch user data');
+      return await response.json();
     } catch (err) {
       console.error('Error fetching user data:', err);
       throw err;
@@ -76,30 +62,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserProfile = async (data: Partial<UserData>) => {
     if (!firebaseUser) throw new Error("Not authenticated");
 
-    try {
-      const userDocRef = doc(db, "users", firebaseUser.uid);
+    if (data.username) {
+      try {
+        const response = await fetch(`/api/users/${firebaseUser.uid}/username`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username: data.username })
+        });
 
-      // Convert Date objects to Firestore Timestamps
-      const firestoreData: Record<string, any> = {};
-      for (const [key, value] of Object.entries(data)) {
-        if (value instanceof Date) {
-          firestoreData[key] = Timestamp.fromDate(value);
-        } else {
-          firestoreData[key] = value;
-        }
+        if (!response.ok) throw new Error('Failed to update username');
+        const updatedUser = await response.json();
+        setUser(updatedUser);
+        queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
+      } catch (err) {
+        console.error('Error updating username:', err);
+        throw err;
       }
+    }
 
-      await updateDoc(userDocRef, firestoreData);
+    if (data.currentWorkout !== undefined) {
+      try {
+        const response = await fetch(`/api/users/${firebaseUser.uid}/current-workout`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ workout: data.currentWorkout })
+        });
 
-      // Fetch fresh user data to ensure local state is up to date
-      const freshUserData = await fetchUserData(firebaseUser);
-      setUser(freshUserData);
-
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
-    } catch (err) {
-      console.error('Error updating profile:', err);
-      throw err;
+        if (!response.ok) throw new Error('Failed to update current workout');
+        const updatedUser = await response.json();
+        setUser(updatedUser);
+      } catch (err) {
+        console.error('Error updating current workout:', err);
+        throw err;
+      }
     }
   };
 

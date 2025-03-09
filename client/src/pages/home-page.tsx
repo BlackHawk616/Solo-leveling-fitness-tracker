@@ -17,11 +17,9 @@ import { Timer, Trophy, History, Crown, Star, Shield, Award, Swords, Zap,
   Flame, Sparkles, Gem, Diamond } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
 import type { WorkoutData } from "@/lib/firebase";
 
-// Update rank icons mapping with more diverse icons
+// Rank icons mapping with diverse icons
 const rankStyles = {
   "E Rank": { icon: Shield, color: "text-gray-400", bg: "bg-gray-400/10" },
   "D Rank": { icon: Shield, color: "text-bronze-400", bg: "bg-bronze-400/10" },
@@ -54,38 +52,17 @@ export default function HomePage() {
     queryKey: ["workouts", firebaseUser?.uid],
     queryFn: async () => {
       if (!firebaseUser) return [];
-
-      try {
-        const workoutsRef = collection(db, "workouts");
-        const q = query(
-          workoutsRef,
-          where("userId", "==", firebaseUser.uid),
-          orderBy("startedAt", "desc"),
-          limit(10)
-        );
-
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            startedAt: data.startedAt.toDate(),
-            endedAt: data.endedAt.toDate()
-          };
-        }) as WorkoutData[];
-      } catch (error) {
-        console.error('Error fetching workouts:', error);
-        return [];
-      }
+      const response = await fetch(`/api/workouts/${firebaseUser.uid}`);
+      if (!response.ok) throw new Error('Failed to fetch workouts');
+      return response.json();
     },
-    enabled: !!firebaseUser && !!user,
+    enabled: !!firebaseUser && !!user
   });
 
   // Username update mutation
   const updateUsernameMutation = useMutation({
     mutationFn: async (newName: string) => {
-      if (!firebaseUser) throw new Error("Not authenticated");
+      if (!user) throw new Error("Not authenticated");
       await updateUserProfile({ username: newName });
       return newName;
     },
@@ -110,50 +87,22 @@ export default function HomePage() {
     mutationFn: async (data: { name: string; durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
 
-      try {
-        const now = new Date();
-        const startTime = startTimeRef.current || now;
-
-        // First save the workout
-        const workoutRef = await addDoc(collection(db, "workouts"), {
+      const response = await fetch('/api/workouts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           userId: firebaseUser.uid,
           name: data.name,
           durationSeconds: data.durationSeconds,
-          startedAt: Timestamp.fromDate(startTime),
-          endedAt: Timestamp.fromDate(now)
-        });
+          startedAt: startTimeRef.current || new Date(),
+          endedAt: new Date()
+        })
+      });
 
-        // Calculate and update user stats
-        const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
-        const newExp = user.exp + expGained;
-        const newTotalSeconds = (user.totalWorkoutSeconds || 0) + data.durationSeconds;
-        const newLevel = calculateNewLevel(newExp);
-
-        await updateUserProfile({
-          exp: newExp,
-          totalWorkoutSeconds: newTotalSeconds,
-          level: newLevel,
-          currentWorkout: null
-        });
-
-        // Refresh workouts list
-        await refetchWorkouts();
-
-        return {
-          workout: {
-            id: workoutRef.id,
-            userId: firebaseUser.uid,
-            name: data.name,
-            durationSeconds: data.durationSeconds,
-            startedAt: startTime,
-            endedAt: now
-          },
-          expGained
-        };
-      } catch (error) {
-        console.error('Error saving workout:', error);
-        throw error;
-      }
+      if (!response.ok) throw new Error('Failed to save workout');
+      return response.json();
     },
     onSuccess: (data) => {
       playSuccessSound();
@@ -167,7 +116,8 @@ export default function HomePage() {
       setElapsedSeconds(0);
       startTimeRef.current = undefined;
 
-      // Refresh user data to get updated stats
+      // Refresh workouts and user data
+      refetchWorkouts();
       refreshUserData();
     },
     onError: (error: Error) => {
@@ -252,7 +202,6 @@ export default function HomePage() {
 
     startTimeRef.current = new Date();
     setIsTracking(true);
-
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
@@ -439,7 +388,7 @@ export default function HomePage() {
                   <div>
                     <div className="font-medium">{workout.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {formatDate(new Date(workout.startedAt))}
+                      {formatDate(workout.startedAt)}
                     </div>
                   </div>
                   <div className="font-mono text-primary">
@@ -493,15 +442,3 @@ function calculateNewLevel(totalExp: number): number {
   }
   return level;
 }
-
-const handleUsernameUpdate = async () => {
-  if (!newUsername.trim()) {
-    toast({
-      title: "Error",
-      description: "Username cannot be empty",
-      variant: "destructive"
-    });
-    return;
-  }
-  await updateUsernameMutation.mutateAsync(newUsername);
-};
