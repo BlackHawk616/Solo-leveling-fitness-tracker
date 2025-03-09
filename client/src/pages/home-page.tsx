@@ -39,7 +39,7 @@ const rankStyles = {
 };
 
 export default function HomePage() {
-  const { user, firebaseUser, logoutMutation, updateUserProfile } = useAuth();
+  const { user, firebaseUser, logoutMutation, updateUserProfile, refreshUserData } = useAuth();
   const { toast } = useToast();
   const [isTracking, setIsTracking] = useState(false);
   const [workoutName, setWorkoutName] = useState("");
@@ -51,9 +51,10 @@ export default function HomePage() {
 
   // Fetch workouts
   const { data: workouts = [], refetch: refetchWorkouts } = useQuery({
-    queryKey: ["/workouts", firebaseUser?.uid],
+    queryKey: ["workouts", firebaseUser?.uid],
     queryFn: async () => {
       if (!firebaseUser) return [];
+
       try {
         const workoutsRef = collection(db, "workouts");
         const q = query(
@@ -62,6 +63,7 @@ export default function HomePage() {
           orderBy("startedAt", "desc"),
           limit(10)
         );
+
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -83,7 +85,7 @@ export default function HomePage() {
   // Username update mutation
   const updateUsernameMutation = useMutation({
     mutationFn: async (newName: string) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!firebaseUser) throw new Error("Not authenticated");
       await updateUserProfile({ username: newName });
       return newName;
     },
@@ -105,50 +107,68 @@ export default function HomePage() {
 
   // Workout mutation
   const workoutMutation = useMutation({
-    mutationFn: async (data: { name: string, durationSeconds: number }) => {
+    mutationFn: async (data: { name: string; durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
 
       try {
         const now = new Date();
-        const workout: WorkoutData = {
+        const startTime = startTimeRef.current || now;
+
+        // First save the workout
+        const workoutRef = await addDoc(collection(db, "workouts"), {
           userId: firebaseUser.uid,
           name: data.name,
           durationSeconds: data.durationSeconds,
-          startedAt: startTimeRef.current || now,
-          endedAt: now
-        };
-
-        // First, save the workout
-        const workoutRef = await addDoc(collection(db, "workouts"), {
-          ...workout,
-          startedAt: Timestamp.fromDate(workout.startedAt),
-          endedAt: Timestamp.fromDate(workout.endedAt)
+          startedAt: Timestamp.fromDate(startTime),
+          endedAt: Timestamp.fromDate(now)
         });
 
-        // Calculate experience gained
+        // Calculate and update user stats
         const expGained = Math.floor((data.durationSeconds / 3600) * 1000);
+        const newExp = user.exp + expGained;
+        const newTotalSeconds = (user.totalWorkoutSeconds || 0) + data.durationSeconds;
+        const newLevel = calculateNewLevel(newExp);
 
-        // Then update user stats
         await updateUserProfile({
-          exp: user.exp + expGained,
-          totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + data.durationSeconds,
-          level: calculateNewLevel(user.exp + expGained),
+          exp: newExp,
+          totalWorkoutSeconds: newTotalSeconds,
+          level: newLevel,
           currentWorkout: null
         });
 
-        return { workout: { ...workout, id: workoutRef.id }, expGained };
+        // Refresh workouts list
+        await refetchWorkouts();
+
+        return {
+          workout: {
+            id: workoutRef.id,
+            userId: firebaseUser.uid,
+            name: data.name,
+            durationSeconds: data.durationSeconds,
+            startedAt: startTime,
+            endedAt: now
+          },
+          expGained
+        };
       } catch (error) {
         console.error('Error saving workout:', error);
         throw error;
       }
     },
     onSuccess: (data) => {
-      refetchWorkouts();
       playSuccessSound();
       toast({
         title: "Workout Completed!",
         description: `Gained ${data.expGained} EXP`
       });
+
+      // Reset workout state
+      setWorkoutName("");
+      setElapsedSeconds(0);
+      startTimeRef.current = undefined;
+
+      // Refresh user data to get updated stats
+      refreshUserData();
     },
     onError: (error: Error) => {
       toast({
@@ -159,6 +179,54 @@ export default function HomePage() {
     }
   });
 
+  // Save timer state periodically
+  useEffect(() => {
+    if (!isTracking || !startTimeRef.current) return;
+
+    const saveTimerState = async () => {
+      try {
+        await updateUserProfile({
+          currentWorkout: {
+            name: workoutName,
+            startTime: startTimeRef.current!.getTime(),
+            elapsedSeconds
+          }
+        });
+      } catch (error) {
+        console.error('Failed to save timer state:', error);
+      }
+    };
+
+    const saveInterval = setInterval(saveTimerState, 5000);
+    return () => clearInterval(saveInterval);
+  }, [isTracking, workoutName, elapsedSeconds]);
+
+  // Restore timer state on mount
+  useEffect(() => {
+    if (!user?.currentWorkout || isTracking) return;
+
+    const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
+    setWorkoutName(name);
+    startTimeRef.current = new Date(startTime);
+    setElapsedSeconds(savedSeconds);
+    setIsTracking(true);
+
+    // Resume timer
+    timerRef.current = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+  }, [user?.currentWorkout]);
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  // Handle username update
   const handleUsernameUpdate = async () => {
     if (!newUsername.trim()) {
       toast({
@@ -171,60 +239,7 @@ export default function HomePage() {
     await updateUsernameMutation.mutateAsync(newUsername);
   };
 
-  // Timer persistence
-  useEffect(() => {
-    const saveTimer = async () => {
-      if (isTracking && user && startTimeRef.current) {
-        try {
-          await updateUserProfile({
-            currentWorkout: {
-              name: workoutName,
-              startTime: startTimeRef.current.getTime(),
-              elapsedSeconds
-            }
-          });
-        } catch (error) {
-          console.error('Error saving timer state:', error);
-        }
-      }
-    };
-
-    // Save timer state every 5 seconds
-    const saveInterval = setInterval(saveTimer, 5000);
-    return () => clearInterval(saveInterval);
-  }, [isTracking, elapsedSeconds, workoutName, user, updateUserProfile]);
-
-  // Restore timer state on mount
-  useEffect(() => {
-    if (user?.currentWorkout && !isTracking) {
-      const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
-      setWorkoutName(name);
-      startTimeRef.current = new Date(startTime);
-      setElapsedSeconds(savedSeconds);
-      setIsTracking(true);
-
-      // Resume timer
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    }
-  }, [user?.currentWorkout]);
-
-  // Cleanup timer
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  const rank = getRankForLevel(user?.level ?? 1);
-  const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
-  const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
-  const rankStyle = rankStyles[rank.name];
-  const RankIcon = rankStyle.icon;
-
+  // Start workout
   function startWorkout() {
     if (!workoutName.trim()) {
       toast({
@@ -235,17 +250,20 @@ export default function HomePage() {
       return;
     }
 
-    setIsTracking(true);
     startTimeRef.current = new Date();
+    setIsTracking(true);
+
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
   }
 
+  // Stop workout
   async function stopWorkout() {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
+
     setIsTracking(false);
 
     try {
@@ -253,13 +271,16 @@ export default function HomePage() {
         name: workoutName,
         durationSeconds: elapsedSeconds
       });
-
-      setWorkoutName("");
-      setElapsedSeconds(0);
     } catch (error) {
       console.error("Failed to save workout:", error);
     }
   }
+
+  const rank = getRankForLevel(user?.level ?? 1);
+  const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
+  const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
+  const rankStyle = rankStyles[rank.name];
+  const RankIcon = rankStyle.icon;
 
   return (
     <div className="min-h-screen bg-background">
@@ -472,3 +493,15 @@ function calculateNewLevel(totalExp: number): number {
   }
   return level;
 }
+
+const handleUsernameUpdate = async () => {
+  if (!newUsername.trim()) {
+    toast({
+      title: "Error",
+      description: "Username cannot be empty",
+      variant: "destructive"
+    });
+    return;
+  }
+  await updateUsernameMutation.mutateAsync(newUsername);
+};

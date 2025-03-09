@@ -42,12 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
+        const userData = userDoc.data();
         // Convert Firestore timestamp to Date
-        if (userData.createdAt instanceof Timestamp) {
+        if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
           userData.createdAt = userData.createdAt.toDate();
         }
-        return userData;
+        return userData as UserData;
       } else {
         // Create basic user profile
         const basicUserData: UserData = {
@@ -80,15 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(db, "users", firebaseUser.uid);
 
       // Convert Date objects to Firestore Timestamps
-      const firestoreData = { ...data };
-      if (data.createdAt instanceof Date) {
-        firestoreData.createdAt = Timestamp.fromDate(data.createdAt);
+      const firestoreData: Record<string, any> = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value instanceof Date) {
+          firestoreData[key] = Timestamp.fromDate(value);
+        } else {
+          firestoreData[key] = value;
+        }
       }
 
       await updateDoc(userDocRef, firestoreData);
 
-      // Update local state
-      setUser(prev => prev ? { ...prev, ...data } : null);
+      // Fetch fresh user data to ensure local state is up to date
+      const freshUserData = await fetchUserData(firebaseUser);
+      setUser(freshUserData);
 
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
@@ -103,6 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setError(null);
         const result = await signInWithPopup(auth, googleProvider);
+        const userData = await fetchUserData(result.user);
+        setUser(userData);
         return result.user;
       } catch (err) {
         console.error('Google sign-in error:', err);
@@ -118,12 +125,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    onSuccess: (user) => {
+    onSuccess: () => {
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
-      // Only redirect after successful authentication
       window.location.href = '/';
     },
     onError: (error: Error) => {
@@ -142,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onSuccess: () => {
       queryClient.clear();
       setUser(null);
+      setFirebaseUser(null);
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",
