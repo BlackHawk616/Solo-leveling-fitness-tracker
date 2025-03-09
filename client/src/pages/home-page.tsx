@@ -134,74 +134,59 @@ export default function HomePage() {
     if (!user?.currentWorkout || isTracking) return;
 
     const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
-
-    // Calculate actual elapsed time including any time that passed while the page was closed
     const now = Date.now();
-    const timeDiff = now - startTime;
 
-    // If more than 6 hours have passed, don't restore the timer
-    if (timeDiff > 6 * 60 * 60 * 1000) {
-      // Clear the current workout as it's expired
+    // Don't restore if more than 6 hours old
+    if (now - startTime > 6 * 60 * 60 * 1000) {
       updateUserProfile({ currentWorkout: null }).catch(console.error);
       return;
     }
 
-    // Calculate additional seconds, ensuring we don't exceed the daily limit
-    const additionalSeconds = Math.min(
-      Math.floor(timeDiff / 1000),
-      6 * 60 * 60 - savedSeconds // Ensure we don't exceed 6 hours
-    );
-
-    const totalElapsedSeconds = Math.min(
-      savedSeconds + additionalSeconds,
-      6 * 60 * 60 // Maximum 6 hours
-    );
-
     setWorkoutName(name);
     startTimeRef.current = new Date(startTime);
-    setElapsedSeconds(totalElapsedSeconds);
+    setElapsedSeconds(savedSeconds);
     setIsTracking(true);
 
-    // Resume timer
+    // Start a new timer
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => {
         const next = prev + 1;
-        // Stop timer if we reach 6 hours
+        // Stop at 6 hours
         if (next >= 6 * 60 * 60) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
+            setIsTracking(false);
           }
-          setIsTracking(false);
           return 6 * 60 * 60;
         }
         return next;
       });
     }, 1000);
 
-    // Cleanup
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, [user?.currentWorkout, updateUserProfile]);
+  }, [user?.currentWorkout, isTracking]);
 
   // Save timer state periodically
   useEffect(() => {
     if (!isTracking || !startTimeRef.current) return;
 
+    // Save initial state
     const saveTimerState = async () => {
-      if (elapsedSeconds >= 6 * 60 * 60) {
-        // Stop tracking if we hit the limit
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-        setIsTracking(false);
-        await updateUserProfile({ currentWorkout: null });
-        return;
-      }
-
       try {
+        // Don't save if we hit the limit
+        if (elapsedSeconds >= 6 * 60 * 60) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
+          setIsTracking(false);
+          await updateUserProfile({ currentWorkout: null });
+          return;
+        }
+
         await updateUserProfile({
           currentWorkout: {
             name: workoutName,
@@ -214,12 +199,12 @@ export default function HomePage() {
       }
     };
 
-    // Save immediately when starting
+    // Save immediately and then every 5 seconds
     saveTimerState();
-
     const saveInterval = setInterval(saveTimerState, 5000);
+
     return () => clearInterval(saveInterval);
-  }, [isTracking, workoutName, elapsedSeconds, updateUserProfile]);
+  }, [isTracking, workoutName, elapsedSeconds]);
 
   // Cleanup timer
   useEffect(() => {
@@ -254,10 +239,27 @@ export default function HomePage() {
       return;
     }
 
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
     startTimeRef.current = new Date();
+    setElapsedSeconds(0);
     setIsTracking(true);
+
     timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
+      setElapsedSeconds(prev => {
+        const next = prev + 1;
+        if (next >= 6 * 60 * 60) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            setIsTracking(false);
+          }
+          return 6 * 60 * 60;
+        }
+        return next;
+      });
     }, 1000);
   }
 
@@ -274,6 +276,9 @@ export default function HomePage() {
         name: workoutName,
         durationSeconds: elapsedSeconds
       });
+
+      // Clear the current workout
+      await updateUserProfile({ currentWorkout: null });
     } catch (error) {
       console.error("Failed to save workout:", error);
     }
