@@ -113,14 +113,20 @@ export default function HomePage() {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to save workout');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save workout');
+      }
       return response.json();
     },
     onSuccess: (data) => {
+      // Calculate EXP gained from level difference
+      const expGained = Math.floor((data.user.exp - (user?.exp ?? 0)));
+
       playSuccessSound();
       toast({
         title: "Workout Completed!",
-        description: `Gained ${data.expGained} EXP`
+        description: `Gained ${expGained} EXP`
       });
 
       // Reset workout state
@@ -133,11 +139,14 @@ export default function HomePage() {
       refreshUserData();
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to save workout",
-        description: error.message,
-        variant: "destructive"
-      });
+      // Only show error toast for actual errors
+      if (error.message !== 'Failed to save workout') {
+        toast({
+          title: "Failed to save workout",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
     }
   });
 
