@@ -176,7 +176,7 @@ export default function HomePage() {
       });
       return;
     }
-    
+
     await updateUsernameMutation.mutateAsync(newUsername);
   };
 

@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { Route, RouteProps, Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -11,7 +12,7 @@ export function ProtectedRoute({
   ...rest
 }: ProtectedRouteProps) {
   const { user, firebaseUser, isLoading } = useAuth();
-  const [redirecting, setRedirecting] = React.useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   return (
     <Route

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { 
   signInWithPopup,
@@ -33,7 +33,7 @@ type AuthContextType = {
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The signed-in user info
         const user = result.user;
         console.log('Google login successful for user:', user.uid);
-        
+
         // Navigate to home page after successful login
         window.location.href = '/';
         return user;
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to fetch user data that can be called to refresh user data
   const fetchUserData = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) return null;
-    
+
     try {
       console.log('Fetching user document for:', firebaseUser.uid);
       const userDocRef = doc(db, "users", firebaseUser.uid);
