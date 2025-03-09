@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   signInWithPopup,
   signOut,
@@ -10,22 +10,7 @@ import {
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
-
-type UserData = {
-  email: string;
-  username: string;
-  level: number;
-  exp: number;
-  totalWorkoutSeconds: number;
-  createdAt: Date;
-  photoURL?: string;
-  lastWorkoutTimestamp?: number;
-  currentWorkout?: {
-    name: string;
-    startTime: number;
-    elapsedSeconds: number;
-  };
-};
+import type { UserData } from "@/lib/firebase";
 
 type AuthContextType = {
   user: UserData | null;
@@ -57,12 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
-        const userData = userDoc.data();
+        const userData = userDoc.data() as UserData;
         // Convert Firestore timestamp to Date
         if (userData.createdAt && typeof userData.createdAt.toDate === 'function') {
           userData.createdAt = userData.createdAt.toDate();
         }
-        return userData as UserData;
+        return userData;
       } else {
         // Create basic user profile
         const basicUserData: UserData = {
@@ -86,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Update user profile function
   const updateUserProfile = async (data: Partial<UserData>) => {
-    if (!firebaseUser || !user) throw new Error("Not authenticated");
+    if (!firebaseUser) throw new Error("Not authenticated");
 
     try {
       const userDocRef = doc(db, "users", firebaseUser.uid);
@@ -97,11 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
-
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been successfully updated.",
-      });
     } catch (err) {
       console.error('Error updating profile:', err);
       throw err;
@@ -113,14 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setError(null);
         const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        return user;
+        return result.user;
       } catch (err) {
         console.error('Google sign-in error:', err);
         const firebaseError = err as { code?: string, message: string };
         let errorMessage = 'Failed to sign in with Google';
 
-        // Add specific error messages for domain-related issues
         if (firebaseError.code === 'auth/unauthorized-domain') {
           errorMessage = 'This domain is not authorized for authentication. Please ensure it has been added to Firebase Console.';
         } else if (firebaseError.code === 'auth/popup-closed-by-user') {

@@ -11,17 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Workout, ranks, getRankForLevel, calculateExpForLevel } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ranks, getRankForLevel, calculateExpForLevel } from "@shared/schema";
 import { formatDuration, formatDate } from "@/lib/workout";
 import { Timer, Trophy, History, Crown, Star, Shield, Award, Swords, Zap,
   Flame, Sparkles, Gem, Diamond } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { playSuccessSound } from "@/lib/sounds";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, updateDoc } from "firebase/firestore";
-import { WorkoutData } from "@/lib/firebase";
-import { updateUserProfile } from "@/lib/user"; // Assuming this function exists
+import { collection, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import type { WorkoutData } from "@/lib/firebase";
 
 // Update rank icons mapping with more diverse icons
 const rankStyles = {
@@ -41,7 +39,7 @@ const rankStyles = {
 };
 
 export default function HomePage() {
-  const { user, firebaseUser, logoutMutation } = useAuth();
+  const { user, firebaseUser, logoutMutation, updateUserProfile } = useAuth();
   const { toast } = useToast();
   const [isTracking, setIsTracking] = useState(false);
   const [workoutName, setWorkoutName] = useState("");
@@ -51,11 +49,11 @@ export default function HomePage() {
   const timerRef = useRef<NodeJS.Timeout>();
   const startTimeRef = useRef<Date>();
 
+  // Fetch workouts
   const { data: workouts = [], refetch: refetchWorkouts } = useQuery({
     queryKey: ["/workouts", firebaseUser?.uid],
     queryFn: async () => {
       if (!firebaseUser) return [];
-
       try {
         const workoutsRef = collection(db, "workouts");
         const q = query(
@@ -64,7 +62,6 @@ export default function HomePage() {
           orderBy("startedAt", "desc"),
           limit(10)
         );
-
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -72,19 +69,13 @@ export default function HomePage() {
         })) as WorkoutData[];
       } catch (error) {
         console.error('Error fetching workouts:', error);
-        // Return empty array on error to prevent loops
         return [];
       }
     },
-    enabled: !!firebaseUser && !!user, // Only run query when both user objects exist
-    retry: 1, // Only retry once
-    retryDelay: 3000, // Wait 3 seconds before retry
-    refetchOnWindowFocus: false, // Prevent refetch on window focus
-    refetchOnMount: false, // Don't refetch when component mounts
-    staleTime: 60000 // Data stays fresh for 1 minute
+    enabled: !!firebaseUser && !!user,
   });
 
-  // Update the updateUsernameMutation to use the new updateUserProfile function
+  // Update username mutation
   const updateUsernameMutation = useMutation({
     mutationFn: async (newName: string) => {
       if (!user) throw new Error("Not authenticated");
@@ -107,7 +98,7 @@ export default function HomePage() {
     }
   });
 
-  // Update the workout mutation to properly handle Firebase persistence
+  // Workout mutation
   const workoutMutation = useMutation({
     mutationFn: async (data: { name: string, durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
@@ -132,8 +123,7 @@ export default function HomePage() {
           exp: user.exp + expGained,
           totalWorkoutSeconds: (user.totalWorkoutSeconds || 0) + data.durationSeconds,
           level: calculateNewLevel(user.exp + expGained),
-          currentWorkout: null, // Clear current workout
-          lastWorkoutTimestamp: Date.now()
+          currentWorkout: null // Clear current workout
         });
 
         return { workout: { ...workout, id: workoutRef.id }, expGained };
@@ -168,33 +158,35 @@ export default function HomePage() {
       });
       return;
     }
-
     await updateUsernameMutation.mutateAsync(newUsername);
   };
 
-  const rank = getRankForLevel(user?.level ?? 1);
-  const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
-  const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
-  const rankStyle = rankStyles[rank.name];
-  const RankIcon = rankStyle.icon;
-
-  // Add persistance for workout timer
+  // Timer persistence
   useEffect(() => {
-    if (isTracking && user) {
-      // Save current workout state to Firebase
-      updateUserProfile({
-        currentWorkout: {
-          name: workoutName,
-          startTime: startTimeRef.current?.getTime() || Date.now(),
-          elapsedSeconds
+    const saveTimer = async () => {
+      if (isTracking && user && startTimeRef.current) {
+        try {
+          await updateUserProfile({
+            currentWorkout: {
+              name: workoutName,
+              startTime: startTimeRef.current.getTime(),
+              elapsedSeconds
+            }
+          });
+        } catch (error) {
+          console.error('Error saving timer state:', error);
         }
-      }).catch(console.error);
-    }
-  }, [isTracking, elapsedSeconds, workoutName, user]);
+      }
+    };
 
-  // Restore workout state on component mount
+    // Save timer state every 5 seconds
+    const saveInterval = setInterval(saveTimer, 5000);
+    return () => clearInterval(saveInterval);
+  }, [isTracking, elapsedSeconds, workoutName, user, updateUserProfile]);
+
+  // Restore timer state on mount
   useEffect(() => {
-    if (user?.currentWorkout) {
+    if (user?.currentWorkout && !isTracking) {
       const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
       setWorkoutName(name);
       startTimeRef.current = new Date(startTime);
@@ -206,15 +198,9 @@ export default function HomePage() {
         setElapsedSeconds(prev => prev + 1);
       }, 1000);
     }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
   }, [user?.currentWorkout]);
 
-
+  // Cleanup timer
   useEffect(() => {
     return () => {
       if (timerRef.current) {
@@ -222,6 +208,12 @@ export default function HomePage() {
       }
     };
   }, []);
+
+  const rank = getRankForLevel(user?.level ?? 1);
+  const expForNextLevel = calculateExpForLevel(user?.level ?? 1);
+  const expProgress = ((user?.exp ?? 0) / expForNextLevel) * 100;
+  const rankStyle = rankStyles[rank.name];
+  const RankIcon = rankStyle.icon;
 
   function startWorkout() {
     if (!workoutName.trim()) {
