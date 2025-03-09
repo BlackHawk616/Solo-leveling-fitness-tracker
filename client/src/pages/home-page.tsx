@@ -71,13 +71,16 @@ export default function HomePage() {
         })) as WorkoutData[];
       } catch (error) {
         console.error('Error fetching workouts:', error);
-        // Only show toast once, not in a loop
+        // Return empty array on error to prevent loops
         return [];
       }
     },
-    enabled: !!firebaseUser,
-    retry: false, // Prevent retries which can cause error loops
-    refetchOnWindowFocus: false // Prevent refetch on window focus which can cause error loops
+    enabled: !!firebaseUser && !!user, // Only run query when both user objects exist
+    retry: 1, // Only retry once
+    retryDelay: 3000, // Wait 3 seconds before retry
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Don't refetch when component mounts
+    staleTime: 60000 // Data stays fresh for 1 minute
   });
 
   const workoutMutation = useMutation({

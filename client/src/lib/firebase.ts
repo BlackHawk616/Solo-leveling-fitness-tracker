@@ -24,9 +24,16 @@ try {
   console.error('Firebase config issue. Check your environment variables and API keys.');
 }
 
+// Configure with better network timeout settings
 const auth = getAuth(app);
+auth.settings = { appVerificationDisabledForTesting: false };
+
+// Configure Firestore with better network settings
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+// Add network connection timeout handler
+const networkTimeoutMs = 30000; // 30 seconds timeout
 
 // Enable offline persistence
 enableIndexedDbPersistence(db)

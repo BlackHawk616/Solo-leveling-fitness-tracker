@@ -11,6 +11,7 @@ export function ProtectedRoute({
   ...rest
 }: ProtectedRouteProps) {
   const { user, firebaseUser, isLoading } = useAuth();
+  const [redirecting, setRedirecting] = React.useState(false);
 
   return (
     <Route
@@ -25,9 +26,18 @@ export function ProtectedRoute({
           );
         }
 
-        if (!user && !firebaseUser) {
+        if (!user && !firebaseUser && !redirecting) {
           console.log("Protected route: No user found, redirecting to auth");
-          return <Redirect to="/auth" />;
+          // Prevent multiple redirects
+          setRedirecting(true);
+          // Use a timeout to give auth time to resolve
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 100);
+          return <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Redirecting to login...</span>
+          </div>;
         }
 
         return <Component {...props} />;
