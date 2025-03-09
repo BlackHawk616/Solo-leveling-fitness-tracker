@@ -79,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           errorMessage = 'Multiple popup requests were triggered. Only the latest will be displayed';
         } else if (firebaseError.code === 'auth/popup-blocked') {
           errorMessage = 'The popup was blocked by the browser. Please check your popup settings';
+        } else if (firebaseError.code === 'auth/api-key-not-valid') {
+          errorMessage = 'Firebase API key is invalid. Check your environment variables';
+        } else if (firebaseError.code === 'auth/invalid-api-key') {
+          errorMessage = 'Firebase API key is invalid. Check your environment variables';
+        } else if (firebaseError.code === 'auth/configuration-not-found') {
+          errorMessage = 'Firebase configuration is missing or incorrect';
         }
 
         setError(new Error(errorMessage));
