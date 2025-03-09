@@ -131,44 +131,58 @@ export default function HomePage() {
 
   // Restore timer state on mount
   useEffect(() => {
+    // Only attempt to restore if we have a current workout and not already tracking
     if (!user?.currentWorkout || isTracking) return;
 
-    const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
-    const now = Date.now();
+    try {
+      const { name, startTime, elapsedSeconds: savedSeconds } = user.currentWorkout;
+      const now = Date.now();
 
-    // Don't restore if more than 6 hours old
-    if (now - startTime > 6 * 60 * 60 * 1000) {
+      // Don't restore if more than 6 hours old
+      if (now - startTime > 6 * 60 * 60 * 1000) {
+        updateUserProfile({ currentWorkout: null }).catch(console.error);
+        return;
+      }
+
+      // Set up state in correct order
+      setWorkoutName(name);
+      startTimeRef.current = new Date(startTime);
+      setElapsedSeconds(savedSeconds);
+      
+      // Set tracking state last
+      setTimeout(() => {
+        setIsTracking(true);
+        
+        // Start a new timer with a delay to ensure state is updated
+        setTimeout(() => {
+          timerRef.current = setInterval(() => {
+            setElapsedSeconds(prev => {
+              const next = prev + 1;
+              // Stop at 6 hours
+              if (next >= 6 * 60 * 60) {
+                if (timerRef.current) {
+                  clearInterval(timerRef.current);
+                  setIsTracking(false);
+                }
+                return 6 * 60 * 60;
+              }
+              return next;
+            });
+          }, 1000);
+        }, 50);
+      }, 50);
+    } catch (error) {
+      console.error("Error restoring workout:", error);
+      // Clear the corrupted workout data
       updateUserProfile({ currentWorkout: null }).catch(console.error);
-      return;
     }
-
-    setWorkoutName(name);
-    startTimeRef.current = new Date(startTime);
-    setElapsedSeconds(savedSeconds);
-    setIsTracking(true);
-
-    // Start a new timer
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => {
-        const next = prev + 1;
-        // Stop at 6 hours
-        if (next >= 6 * 60 * 60) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            setIsTracking(false);
-          }
-          return 6 * 60 * 60;
-        }
-        return next;
-      });
-    }, 1000);
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, [user?.currentWorkout, isTracking]);
+  }, [user?.currentWorkout]);
 
   // Save timer state periodically
   useEffect(() => {
@@ -239,31 +253,36 @@ export default function HomePage() {
       return;
     }
 
-    // Clear any existing timer
+    // Reset state completely
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = undefined;
     }
 
+    // Set tracking state first to update UI
+    setIsTracking(true);
+    
     // Set the start time and reset elapsed seconds
     startTimeRef.current = new Date();
     setElapsedSeconds(0);
-    setIsTracking(true);
-
-    // Start the timer
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => {
-        const next = prev + 1;
-        // Cap at 6 hours
-        if (next >= 6 * 60 * 60) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            setIsTracking(false);
+    
+    // Start the timer with a slight delay to ensure state is updated
+    setTimeout(() => {
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => {
+          const next = prev + 1;
+          // Cap at 6 hours
+          if (next >= 6 * 60 * 60) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              setIsTracking(false);
+            }
+            return 6 * 60 * 60;
           }
-          return 6 * 60 * 60;
-        }
-        return next;
-      });
-    }, 1000);
+          return next;
+        });
+      }, 1000);
+    }, 50);
   }
 
   // Stop workout
@@ -271,37 +290,50 @@ export default function HomePage() {
     // Only proceed if we're actually tracking
     if (!isTracking) return;
     
-    // Clear the timer
+    // Capture the current elapsed seconds and workout name
+    const finalElapsedSeconds = elapsedSeconds;
+    const finalWorkoutName = workoutName;
+    
+    // Clear the timer first
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
     }
 
-    // Stop tracking before API call to prevent UI glitches
+    // Stop tracking immediately to update UI
     setIsTracking(false);
 
     // Don't submit if elapsed time is too short
-    if (elapsedSeconds < 1) {
+    if (finalElapsedSeconds < 1) {
       toast({
         title: "Workout too short",
         description: "Workout must be at least 1 second long",
         variant: "destructive"
       });
+      // Reset workout name input
+      setWorkoutName("");
       return;
     }
 
     try {
       await workoutMutation.mutateAsync({
-        name: workoutName,
-        durationSeconds: elapsedSeconds
+        name: finalWorkoutName,
+        durationSeconds: finalElapsedSeconds
       });
 
       // Clear the current workout
       await updateUserProfile({ currentWorkout: null });
+      
+      // Reset workout name after successful save
+      setWorkoutName("");
     } catch (error) {
       console.error("Failed to save workout:", error);
-      // Restore tracking state if the API call fails
-      setIsTracking(true);
+      // Don't restore tracking state on error, just show an error message
+      toast({
+        title: "Error saving workout",
+        description: "Please try again",
+        variant: "destructive"
+      });
     }
   }
 
@@ -431,16 +463,27 @@ export default function HomePage() {
                 />
                 <div className="text-center">
                   <div className="text-4xl font-mono mb-4 text-primary">
-                    {formatDuration(elapsedSeconds)}
+                    {isTracking ? formatDuration(elapsedSeconds) : "0s"}
                   </div>
-                  <Button 
-                    onClick={isTracking ? stopWorkout : startWorkout} 
-                    variant={isTracking ? "destructive" : "default"}
-                    className={`w-full ${!isTracking ? "bg-gradient-to-r from-primary to-purple-600" : ""}`}
-                    disabled={workoutMutation.isPending}
-                  >
-                    {isTracking ? "Stop Workout" : "Start Workout"}
-                  </Button>
+                  {!isTracking ? (
+                    <Button 
+                      onClick={startWorkout} 
+                      variant="default"
+                      className="w-full bg-gradient-to-r from-primary to-purple-600"
+                      disabled={workoutMutation.isPending}
+                    >
+                      Start Workout
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={stopWorkout} 
+                      variant="destructive"
+                      className="w-full"
+                      disabled={workoutMutation.isPending}
+                    >
+                      Stop Workout
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
