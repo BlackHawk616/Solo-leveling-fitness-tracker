@@ -11,5 +11,25 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Validate that the DATABASE_URL has sslmode=require
+if (!process.env.DATABASE_URL.includes('sslmode=require')) {
+  throw new Error(
+    "DATABASE_URL must include '?sslmode=require' for secure connections.",
+  );
+}
+
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 8000, // 8 second timeout
+  max: 20 // Maximum number of clients in the pool
+});
+
+// Test the connection on startup
+pool.connect().then(() => {
+  console.log('Successfully connected to the database');
+}).catch((err) => {
+  console.error('Failed to connect to the database:', err.message);
+  throw err;
+});
+
 export const db = drizzle({ client: pool, schema });
