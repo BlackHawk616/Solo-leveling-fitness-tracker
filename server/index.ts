@@ -37,14 +37,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  console.log('Starting server...');
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    console.error('Server error:', err);
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -58,7 +58,7 @@ app.use((req, res, next) => {
 
   // Try to serve on port 5000, fallback to other ports if needed
   let port = 5000;
-  
+
   const startServer = (attemptPort: number) => {
     server.listen({
       port: attemptPort,
@@ -75,6 +75,6 @@ app.use((req, res, next) => {
       }
     });
   };
-  
+
   startServer(port);
 })();

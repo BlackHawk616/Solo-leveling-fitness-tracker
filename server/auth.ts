@@ -56,9 +56,9 @@ export function setupAuth(app: Express) {
     new LocalStrategy({
       usernameField: 'email',
       passwordField: 'password'
-    }, async (email, password, done) => {
+    }, async (email: string, password: string, done: Function) => {
       try {
-        const user = await storage.getUserByEmail(email);
+        const user = await storage.getUser(email);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false, { message: "Invalid email or password" });
         }
@@ -70,12 +70,12 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => {
+  passport.serializeUser((user: SelectUser, done: Function) => {
     console.log('Serializing user:', user.id);
     done(null, user.id);
   });
 
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (id: string, done: Function) => {
     try {
       console.log('Deserializing user:', id);
       const user = await storage.getUser(id);
@@ -91,12 +91,12 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res) => {
     try {
-      const existingUser = await storage.getUserByEmail(req.body.email);
+      const existingUser = await storage.getUser(req.body.email);
       if (existingUser) {
         return res.status(400).json({ message: "Email already exists" });
       }
 
-      const user = await storage.createUser({
+      const user = await storage.createUser(req.body.email, {
         ...req.body,
         password: await hashPassword(req.body.password),
       });
@@ -115,7 +115,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: Error | null, user: SelectUser | false, info: { message: string } | undefined) => {
       if (err) {
         console.error('Login error:', err);
         return next(err);

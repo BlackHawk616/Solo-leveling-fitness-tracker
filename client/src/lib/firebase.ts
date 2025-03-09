@@ -58,4 +58,14 @@ export interface WorkoutData {
   id?: string;
 }
 
+// Add Workout type that matches the server response
+export interface Workout {
+  id: number;
+  userId: string;
+  name: string;
+  durationSeconds: number;
+  startedAt: Date;
+  endedAt: Date;
+}
+
 export { auth, db, storage, googleProvider };
