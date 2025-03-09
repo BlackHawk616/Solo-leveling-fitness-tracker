@@ -50,7 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to fetch user data');
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+
       return await response.json();
     } catch (err) {
       console.error('Error fetching user data:', err);
@@ -62,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserProfile = async (data: Partial<UserData>) => {
     if (!firebaseUser) throw new Error("Not authenticated");
 
-    if (data.username) {
-      try {
+    try {
+      if (data.username) {
         const response = await fetch(`/api/users/${firebaseUser.uid}/username`, {
           method: 'PATCH',
           headers: {
@@ -75,15 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) throw new Error('Failed to update username');
         const updatedUser = await response.json();
         setUser(updatedUser);
-        queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
-      } catch (err) {
-        console.error('Error updating username:', err);
-        throw err;
       }
-    }
 
-    if (data.currentWorkout !== undefined) {
-      try {
+      if (data.currentWorkout !== undefined) {
         const response = await fetch(`/api/users/${firebaseUser.uid}/current-workout`, {
           method: 'PATCH',
           headers: {
@@ -95,10 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) throw new Error('Failed to update current workout');
         const updatedUser = await response.json();
         setUser(updatedUser);
-      } catch (err) {
-        console.error('Error updating current workout:', err);
-        throw err;
       }
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      throw err;
     }
   };
 
