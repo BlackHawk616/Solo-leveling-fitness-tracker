@@ -12,7 +12,8 @@
     "cap:init": "npx cap init 'Solo Leveling Fitness' com.solofitness.app --web-dir=dist/public",
     "cap:add": "npx cap add android",
     "cap:sync": "npx cap sync",
-    "build:android": "npm run build && npm run cap:sync && npx cap open android"
+    "build:android": "npm run build && npm run cap:sync && npx cap open android",
+    "build:android:apk": "./build-android-apk.sh"
   },
   "dependencies": {
     "@firebase/analytics": "^0.10.12",
