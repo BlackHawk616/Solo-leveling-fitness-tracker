@@ -4,5 +4,13 @@
   "webDir": "dist/public",
   "server": {
     "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "keystore.jks",
+      "keystorePassword": "android",
+      "keystoreAlias": "androiddebugkey",
+      "keystoreAliasPassword": "android"
+    }
   }
 }

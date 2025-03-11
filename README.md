@@ -9,17 +9,9 @@ A gamified workout tracking application inspired by Solo Leveling, built with Re
 - Rank progression system
 - Persistent workout history
 
-## Tech Stack
-- Frontend: React + TypeScript + Vite
-- Backend: Express + Node.js
-- Database: PostgreSQL
-- Authentication: Firebase
-- Styling: Tailwind CSS + shadcn/ui
-- Mobile: Capacitor for Android build
-
 ## Building the Android APK
 
-### Through GitHub Actions (Recommended)
+### Steps to Build:
 1. Create a GitHub account if you don't have one at [GitHub](https://github.com)
 2. Create a new repository:
    - Go to https://github.com/new
@@ -29,7 +21,6 @@ A gamified workout tracking application inspired by Solo Leveling, built with Re
 
 3. Push your code to GitHub:
    ```bash
-   # In your Replit shell
    git init
    git add .
    git commit -m "Initial commit"
@@ -38,28 +29,9 @@ A gamified workout tracking application inspired by Solo Leveling, built with Re
    git push -u origin main
    ```
 
-4. The Android APK build will start automatically:
-   - Go to your GitHub repository
-   - Click the "Actions" tab
-   - You'll see "Build Android App" workflow running
-   - Wait for it to complete (takes about 5-10 minutes)
-   - Click on the completed workflow
-   - Scroll down to "Artifacts"
-   - Download the "app-debug" file
-   - Extract the .zip to get your .apk file
-
-5. Install the APK on your Android device:
-   - Transfer the APK to your Android device
-   - On your device, open the APK
-   - Allow installation from unknown sources if prompted
-   - Follow the installation prompts
-
-### Troubleshooting
-If the build fails:
-1. Check the Actions tab for error details
-2. Make sure all environment variables are set in GitHub:
+4. Add Firebase secrets in GitHub:
    - Go to repository Settings > Secrets and Variables > Actions
-   - Add your Firebase configuration as secrets:
+   - Add these secrets from your .env file:
      ```
      VITE_FIREBASE_API_KEY
      VITE_FIREBASE_AUTH_DOMAIN
@@ -68,12 +40,32 @@ If the build fails:
      VITE_FIREBASE_MESSAGING_SENDER_ID
      VITE_FIREBASE_APP_ID
      ```
-3. Try re-running the workflow after fixing any issues
 
-## Development
-1. Copy `.env.example` to `.env` and fill in the values
-2. Install dependencies: `npm install`
-3. Start the development server: `npm run dev`
+5. Get your APK:
+   - Go to your repository's Actions tab
+   - Wait for the "Build Android App" workflow to complete (5-10 minutes)
+   - Download the "app-debug" artifact
+   - Extract the .zip to get your APK file
+
+6. Install on Android:
+   - Transfer the APK to your Android device
+   - Open the APK file
+   - Allow installation from unknown sources if prompted
+   - Follow the installation prompts
+
+### Need Help?
+If the build fails:
+1. Check the Actions tab for error details
+2. Verify all Firebase secrets are added correctly
+3. Try running the workflow again
+
+## Tech Stack
+- Frontend: React + TypeScript + Vite
+- Backend: Express + Node.js
+- Database: PostgreSQL
+- Authentication: Firebase
+- Styling: Tailwind CSS + shadcn/ui
+- Mobile: Capacitor for Android build
 
 ## License
 MIT
