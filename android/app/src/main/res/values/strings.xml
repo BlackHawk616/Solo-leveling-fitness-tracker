@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Solo Leveling Fitness</string>
+    <string name="title_activity_main">Solo Leveling Fitness</string>
+    <string name="package_name">com.solofitness.app</string>
+    <string name="custom_url_scheme">com.solofitness.app</string>
+</resources>
