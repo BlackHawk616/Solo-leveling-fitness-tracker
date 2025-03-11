@@ -37,11 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) return null;
 
     try {
+      const token = await firebaseUser.getIdToken(true); // Force refresh token
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           id: firebaseUser.uid,
@@ -70,12 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) throw new Error("Not authenticated");
 
     try {
+      const token = await firebaseUser.getIdToken(true);
+
       if (data.username) {
         const response = await fetch(`/api/users/${firebaseUser.uid}/username`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ username: data.username })
         });
@@ -95,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ workout: data.currentWorkout })
         });
@@ -109,9 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(updatedUser);
         queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
       }
-
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
     } catch (err) {
       console.error('Error updating profile:', err);
       throw err;
@@ -121,10 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Function to refresh user data
   const refreshUserData = async () => {
     if (!firebaseUser) return;
-
     try {
       const freshUserData = await fetchUserData(firebaseUser);
       setUser(freshUserData);
+      queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
     } catch (err) {
       console.error('Error refreshing user data:', err);
       throw err;
@@ -158,8 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
-      // Invalidate auth queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['auth'] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
     },
     onError: (error: Error) => {
       toast({
@@ -201,8 +200,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (firebaseUser) {
           const userData = await fetchUserData(firebaseUser);
           setUser(userData);
+          queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
         } else {
           setUser(null);
+          queryClient.clear();
         }
       } catch (err) {
         console.error('Auth state change error:', err);
