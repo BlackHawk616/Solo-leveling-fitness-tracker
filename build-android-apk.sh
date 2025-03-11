@@ -2,42 +2,51 @@
 
 echo "Building Solo Leveling Fitness App APK..."
 
+# Exit on error
+set -e
+
 # Build the web app
+echo "Building web application..."
 npm run build
 
-# Initialize Capacitor if not already done
-if [ ! -d "android" ]; then
-  echo "Initializing Capacitor..."
-  npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public
-  npx cap add android
-fi
+# Clean up existing Android setup
+echo "Cleaning up existing Android setup..."
+rm -rf android/
+rm -f capacitor.config.ts
 
-# Sync the web code to the Android project
-npx cap sync
+# Set Java environment variables
+export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
+# Initialize Capacitor
+echo "Initializing Capacitor..."
+npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public
+npx cap add android
 
 # Create builds directory if it doesn't exist
 mkdir -p builds
 
-# Create a debug keystore for development
-if [ ! -f "android/app/debug.keystore" ]; then
-  echo "Creating debug keystore..."
-  keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-fi
+# Configure Gradle properties
+echo "Configuring Gradle properties..."
+cat > android/gradle.properties << EOL
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true
+org.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64
+EOL
 
-# Set up local.properties
-echo "sdk.dir=/usr/local/android-sdk" > android/local.properties
+# Sync web code with Android project
+echo "Syncing Capacitor..."
+npx cap sync
 
 cd android
 
-# Update gradle.properties for memory settings
-echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
-echo "android.useAndroidX=true" >> gradle.properties
-echo "android.enableJetifier=true" >> gradle.properties
-
 # Try building debug APK
-./gradlew assembleDebug
+echo "Building debug APK..."
+./gradlew clean assembleDebug --info --stacktrace --scan
 
 # Copy the debug APK to the builds directory
+echo "Copying APK to builds directory..."
 cp app/build/outputs/apk/debug/app-debug.apk ../builds/
 
 echo "Build completed! Check the builds directory for your APK."
