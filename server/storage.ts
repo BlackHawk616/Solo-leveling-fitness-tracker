@@ -127,8 +127,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(workouts)
       .where(eq(workouts.userId, userId))
-      .orderBy(workouts.startedAt)
-      .limit(10);
+      .orderBy(workouts.startedAt);
   }
 
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {

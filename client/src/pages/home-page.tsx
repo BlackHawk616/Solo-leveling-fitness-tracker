@@ -73,7 +73,11 @@ export default function HomePage() {
       if (!firebaseUser) return [];
       const response = await fetch(`/api/workouts/${firebaseUser.uid}`);
       if (!response.ok) throw new Error('Failed to fetch workouts');
-      return response.json();
+      const data = await response.json();
+      // Sort by most recent first
+      return data.sort((a: Workout, b: Workout) => 
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      );
     },
     enabled: !!firebaseUser && !!user
   });
@@ -549,7 +553,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {workouts.map((workout: Workout) => (
+              {workouts.slice(0, 15).map((workout: Workout) => (
                 <div
                   key={workout.id}
                   className="flex items-center justify-between p-4 bg-primary/5 rounded-lg"
@@ -565,6 +569,11 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
+              {workouts.length > 15 && (
+                <div className="text-center text-sm text-muted-foreground pt-2">
+                  Showing 15 most recent workouts of {workouts.length} total
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
