@@ -27,22 +27,17 @@ cat > capacitor.config.json << EOL
 }
 EOL
 
-# Configure Java 17 environment
-export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
-export PATH=$JAVA_HOME/bin:$PATH
-
 # Initialize Capacitor
 echo "Initializing Capacitor..."
 npx cap add android
 
-# Configure Java version in Gradle
+# Configure Gradle properties with Java 17
 echo "Configuring Gradle properties..."
 cat > android/gradle.properties << EOL
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
 android.enableJetifier=true
 android.overridePathCheck=true
-org.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64
 EOL
 
 # Sync web code with Android project
@@ -56,7 +51,7 @@ cd android
 echo "Making gradlew executable..."
 chmod +x gradlew
 
-# Build debug APK
+# Build debug APK with detailed logging
 echo "Building debug APK..."
 ./gradlew clean assembleDebug --info --stacktrace --scan > ../android-build.log 2>&1
 
