@@ -41,9 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
         },
         body: JSON.stringify({
-          firebaseId: firebaseUser.uid,
+          id: firebaseUser.uid,
           email: firebaseUser.email,
           username: firebaseUser.displayName || 'User',
           photoURL: firebaseUser.photoURL
@@ -51,10 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch user data');
+        const errorText = await response.text();
+        console.error('Failed to fetch user data:', errorText);
+        throw new Error(`Failed to fetch user data: ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data;
     } catch (err) {
       console.error('Error fetching user data:', err);
       throw err;
@@ -71,13 +75,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
           },
           body: JSON.stringify({ username: data.username })
         });
 
-        if (!response.ok) throw new Error('Failed to update username');
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to update username:', errorText);
+          throw new Error(`Failed to update username: ${errorText}`);
+        }
         const updatedUser = await response.json();
         setUser(updatedUser);
+        queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
       }
 
       if (data.currentWorkout !== undefined) {
@@ -85,19 +95,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
           },
           body: JSON.stringify({ workout: data.currentWorkout })
         });
 
-        if (!response.ok) throw new Error('Failed to update current workout');
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to update current workout:', errorText);
+          throw new Error(`Failed to update current workout: ${errorText}`);
+        }
         const updatedUser = await response.json();
         setUser(updatedUser);
+        queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
       }
 
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["auth", firebaseUser.uid] });
+      queryClient.invalidateQueries({ queryKey: ['user', firebaseUser.uid] });
     } catch (err) {
       console.error('Error updating profile:', err);
+      throw err;
+    }
+  };
+
+  // Function to refresh user data
+  const refreshUserData = async () => {
+    if (!firebaseUser) return;
+
+    try {
+      const freshUserData = await fetchUserData(firebaseUser);
+      setUser(freshUserData);
+    } catch (err) {
+      console.error('Error refreshing user data:', err);
       throw err;
     }
   };
@@ -129,7 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Login successful",
         description: "You have been logged in successfully.",
       });
-      window.location.href = '/';
+      // Invalidate auth queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
     },
     onError: (error: Error) => {
       toast({
@@ -177,6 +207,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error('Auth state change error:', err);
         setError(err as Error);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Failed to retrieve user data. Please try again.",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -184,19 +219,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe();
   }, []);
-
-  // Function to refresh user data
-  const refreshUserData = async () => {
-    if (!firebaseUser) return;
-
-    try {
-      const freshUserData = await fetchUserData(firebaseUser);
-      setUser(freshUserData);
-    } catch (err) {
-      console.error('Error refreshing user data:', err);
-      throw err;
-    }
-  };
 
   return (
     <AuthContext.Provider

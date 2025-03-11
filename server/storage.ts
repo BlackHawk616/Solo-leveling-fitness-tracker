@@ -35,120 +35,170 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      return user;
+    } catch (error) {
+      console.error('Error in getUser:', error);
+      throw error;
+    }
   }
 
   async getUserByFirebaseId(firebaseId: string): Promise<User | undefined> {
-    return this.getUser(firebaseId);
+    try {
+      // Firebase ID is stored in the id field
+      return this.getUser(firebaseId);
+    } catch (error) {
+      console.error('Error in getUserByFirebaseId:', error);
+      throw error;
+    }
   }
 
   async createUser(firebaseId: string, insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values({
-        id: firebaseId,
-        ...insertUser,
-        level: 1,
-        exp: 0,
-        totalWorkoutSeconds: 0
-      })
-      .returning();
-    return user;
+    try {
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, firebaseId));
+
+      if (existingUser) {
+        return existingUser;
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          id: firebaseId,
+          ...insertUser,
+          level: 1,
+          exp: 0,
+          totalWorkoutSeconds: 0
+        })
+        .returning();
+      return user;
+    } catch (error) {
+      console.error('Error in createUser:', error);
+      throw error;
+    }
   }
 
   async updateUsername(userId: string, username: string): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ username })
-      .where(eq(users.id, userId))
-      .returning();
+    try {
+      const [user] = await db
+        .update(users)
+        .set({ username })
+        .where(eq(users.id, userId))
+        .returning();
 
-    if (!user) throw new Error("User not found");
-    return user;
+      if (!user) throw new Error("User not found");
+      return user;
+    } catch (error) {
+      console.error('Error in updateUsername:', error);
+      throw error;
+    }
   }
 
   async updateUserExp(userId: string, expGained: number): Promise<User> {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId));
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
 
-    if (!user) throw new Error("User not found");
+      if (!user) throw new Error("User not found");
 
-    const newExp = user.exp + expGained;
-    let newLevel = user.level;
+      const newExp = user.exp + expGained;
+      let newLevel = user.level;
 
-    while (newExp >= calculateExpForLevel(newLevel)) {
-      newLevel++;
+      while (newExp >= calculateExpForLevel(newLevel)) {
+        newLevel++;
+      }
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          exp: newExp,
+          level: newLevel
+        })
+        .where(eq(users.id, userId))
+        .returning();
+
+      return updatedUser;
+    } catch (error) {
+      console.error('Error in updateUserExp:', error);
+      throw error;
     }
-
-    const [updatedUser] = await db
-      .update(users)
-      .set({
-        exp: newExp,
-        level: newLevel
-      })
-      .where(eq(users.id, userId))
-      .returning();
-
-    return updatedUser;
   }
 
   async createWorkout(userId: string, workout: InsertWorkout): Promise<Workout> {
-    const [newWorkout] = await db
-      .insert(workouts)
-      .values({
-        userId,
-        ...workout
-      })
-      .returning();
+    try {
+      const [newWorkout] = await db
+        .insert(workouts)
+        .values({
+          userId,
+          ...workout
+        })
+        .returning();
 
-    // Update user's total workout seconds
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId));
+      // Update user's total workout seconds
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
 
-    if (!user) throw new Error("User not found");
+      if (!user) throw new Error("User not found");
 
-    await db
-      .update(users)
-      .set({
-        totalWorkoutSeconds: user.totalWorkoutSeconds + workout.durationSeconds
-      })
-      .where(eq(users.id, userId));
+      await db
+        .update(users)
+        .set({
+          totalWorkoutSeconds: user.totalWorkoutSeconds + workout.durationSeconds
+        })
+        .where(eq(users.id, userId));
 
-    return newWorkout;
+      return newWorkout;
+    } catch (error) {
+      console.error('Error in createWorkout:', error);
+      throw error;
+    }
   }
 
   async getWorkouts(userId: string): Promise<Workout[]> {
-    return db
-      .select()
-      .from(workouts)
-      .where(eq(workouts.userId, userId))
-      .orderBy(workouts.startedAt);
+    try {
+      return db
+        .select()
+        .from(workouts)
+        .where(eq(workouts.userId, userId))
+        .orderBy(workouts.startedAt);
+    } catch (error) {
+      console.error('Error in getWorkouts:', error);
+      throw error;
+    }
   }
 
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
 
-    const result = await db
-      .select({ total: workouts.durationSeconds })
-      .from(workouts)
-      .where(
-        and(
-          eq(workouts.userId, userId),
-          gte(workouts.startedAt, startOfDay),
-          lte(workouts.startedAt, endOfDay)
-        )
-      );
+      const result = await db
+        .select({ total: workouts.durationSeconds })
+        .from(workouts)
+        .where(
+          and(
+            eq(workouts.userId, userId),
+            gte(workouts.startedAt, startOfDay),
+            lte(workouts.startedAt, endOfDay)
+          )
+        );
 
-    return result.reduce((acc, row) => acc + (row.total || 0), 0);
+      return result.reduce((acc, row) => acc + (row.total || 0), 0);
+    } catch (error) {
+      console.error('Error in getDailyWorkoutSeconds:', error);
+      throw error;
+    }
   }
 
   async updateUserCurrentWorkout(userId: string, workout: { 
@@ -156,14 +206,19 @@ export class DatabaseStorage implements IStorage {
     startTime: number;
     elapsedSeconds: number;
   } | null): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ currentWorkout: workout })
-      .where(eq(users.id, userId))
-      .returning();
+    try {
+      const [user] = await db
+        .update(users)
+        .set({ currentWorkout: workout })
+        .where(eq(users.id, userId))
+        .returning();
 
-    if (!user) throw new Error("User not found");
-    return user;
+      if (!user) throw new Error("User not found");
+      return user;
+    } catch (error) {
+      console.error('Error in updateUserCurrentWorkout:', error);
+      throw error;
+    }
   }
 }
 

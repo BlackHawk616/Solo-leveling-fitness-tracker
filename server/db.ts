@@ -47,7 +47,7 @@ pool.connect().then((client) => {
 });
 
 // Create the drizzle client with the pool
-export const db = drizzle({ client: pool, schema });
+export const db = drizzle(pool, { schema });
 
 // Track if we're already closing the pool
 let isClosingPool = false;
