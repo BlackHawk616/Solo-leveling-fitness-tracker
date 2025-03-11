@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
-import { insertWorkoutSchema } from "@shared/schema.js";
+import { insertWorkoutSchema } from "../shared/schema.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Temporary debug endpoint - REMOVE AFTER DEPLOYMENT DEBUG

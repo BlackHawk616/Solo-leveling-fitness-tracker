@@ -1,4 +1,4 @@
-import { User, Workout, InsertUser, InsertWorkout, users, workouts } from "@shared/schema.js";
+import { User, Workout, InsertUser, InsertWorkout, users, workouts } from "../shared/schema.js";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import { db } from "./db.js";
