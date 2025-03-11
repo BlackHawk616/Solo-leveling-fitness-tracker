@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Preparing Solo Leveling Fitness App for Android build..."
+echo "Building Solo Leveling Fitness App APK..."
 
 # Build the web app
 npm run build
@@ -15,19 +15,29 @@ fi
 # Sync the web code to the Android project
 npx cap sync
 
-echo "Android project preparation completed!"
-echo ""
-echo "To build the APK:"
-echo "1. Download the 'android' folder from the Replit file explorer"
-echo "2. Make sure you have Android Studio installed on your computer"
-echo "3. Open the android folder in Android Studio"
-echo "4. Wait for the Gradle sync to complete"
-echo "5. Click Build > Build Bundle(s) / APK(s) > Build APK(s)"
-echo "6. Find the generated APK in android/app/build/outputs/apk/debug/app-debug.apk"
-echo ""
-echo "For a release build:"
-echo "1. Generate a keystore using Android Studio (Build > Generate Signed Bundle / APK)"
-echo "2. Follow the wizard to create a new keystore"
-echo "3. Build a release APK using the keystore"
-echo ""
-echo "Note: Building APKs directly in Replit is not supported due to Android SDK requirements."
+# Create builds directory if it doesn't exist
+mkdir -p builds
+
+# Create a debug keystore for development
+if [ ! -f "android/app/debug.keystore" ]; then
+  echo "Creating debug keystore..."
+  keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+fi
+
+# Set up local.properties
+echo "sdk.dir=/usr/local/android-sdk" > android/local.properties
+
+cd android
+
+# Update gradle.properties for memory settings
+echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
+echo "android.useAndroidX=true" >> gradle.properties
+echo "android.enableJetifier=true" >> gradle.properties
+
+# Try building debug APK
+./gradlew assembleDebug
+
+# Copy the debug APK to the builds directory
+cp app/build/outputs/apk/debug/app-debug.apk ../builds/
+
+echo "Build completed! Check the builds directory for your APK."
