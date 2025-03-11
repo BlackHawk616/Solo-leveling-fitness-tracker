@@ -65,7 +65,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug
+          JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64 ./gradlew assembleDebug --info
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
