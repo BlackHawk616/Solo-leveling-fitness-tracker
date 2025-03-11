@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Building Solo Leveling Fitness App APK..."
+echo "Building Solo Leveling Fitness App for Android..."
 
 # Exit on error
 set -e
@@ -12,26 +12,36 @@ npm run build
 # Clean up existing Android setup
 echo "Cleaning up existing Android setup..."
 rm -rf android/
-rm -f capacitor.config.ts
+rm -f capacitor.config.ts capacitor.config.json
 
-# Set Java environment variables
+# Create minimal Capacitor config
+echo "Creating Capacitor configuration..."
+cat > capacitor.config.json << EOL
+{
+  "appId": "com.solofitness.app",
+  "appName": "Solo Leveling Fitness",
+  "webDir": "dist/public",
+  "server": {
+    "androidScheme": "https"
+  }
+}
+EOL
+
+# Configure Java 17 environment
 export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
 
 # Initialize Capacitor
 echo "Initializing Capacitor..."
-npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public
 npx cap add android
 
-# Create builds directory if it doesn't exist
-mkdir -p builds
-
-# Configure Gradle properties
+# Configure Java version in Gradle
 echo "Configuring Gradle properties..."
 cat > android/gradle.properties << EOL
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
 android.enableJetifier=true
+android.overridePathCheck=true
 org.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64
 EOL
 
@@ -39,14 +49,25 @@ EOL
 echo "Syncing Capacitor..."
 npx cap sync
 
+# Navigate to android directory
 cd android
 
-# Try building debug APK
+# Make gradlew executable
+echo "Making gradlew executable..."
+chmod +x gradlew
+
+# Build debug APK
 echo "Building debug APK..."
-./gradlew clean assembleDebug --info --stacktrace --scan
+./gradlew clean assembleDebug --info --stacktrace --scan > ../android-build.log 2>&1
 
-# Copy the debug APK to the builds directory
-echo "Copying APK to builds directory..."
-cp app/build/outputs/apk/debug/app-debug.apk ../builds/
-
-echo "Build completed! Check the builds directory for your APK."
+# Check build status
+if [ $? -eq 0 ]; then
+    echo "Build successful! Creating builds directory..."
+    mkdir -p ../builds
+    cp app/build/outputs/apk/debug/app-debug.apk ../builds/
+    echo "APK has been copied to the builds directory."
+else
+    echo "Build failed! Check android-build.log for details."
+    tail -n 50 ../android-build.log
+    exit 1
+fi

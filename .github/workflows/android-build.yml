@@ -45,10 +45,12 @@ jobs:
       - name: Clean and reinitialize Capacitor
         run: |
           rm -rf android/
-          rm -f capacitor.config.ts
+          rm -f capacitor.config.ts capacitor.config.json
           npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public
           npx cap add android
-          npx cap sync
+
+      - name: Sync Capacitor
+        run: npx cap sync
 
       - name: Configure Gradle properties
         run: |

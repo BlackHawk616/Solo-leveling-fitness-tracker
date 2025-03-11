@@ -1,0 +1,8 @@
+{
+  "appId": "com.solofitness.app",
+  "appName": "Solo Leveling Fitness",
+  "webDir": "dist/public",
+  "server": {
+    "androidScheme": "https"
+  }
+}
