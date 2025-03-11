@@ -12,6 +12,9 @@ npx cap sync
 echo "Building Release APK..."
 cd android
 
+# Set Java 17 for the build process
+echo "org.gradle.java.home=/nix/store/jd33ngidpqfj6rj0dxmsn1hkdxx6jfwh-openjdk-17.0.9+9/lib/openjdk" >> gradle.properties
+
 # Create local.properties with SDK path
 echo "sdk.dir=$HOME/android-sdk" > local.properties
 
