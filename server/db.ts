@@ -49,13 +49,22 @@ pool.connect().then((client) => {
 // Create the drizzle client with the pool
 export const db = drizzle({ client: pool, schema });
 
-// Handle process termination gracefully
-process.on('SIGTERM', () => {
-  console.log('Closing database pool...');
-  pool.end();
+// Track if we're already closing the pool
+let isClosingPool = false;
+
+// Properly close the connection when the server is shutting down
+process.on('SIGINT', () => {
+  if (!isClosingPool) {
+    isClosingPool = true;
+    console.log('Closing database pool...');
+    pool.end();
+  }
 });
 
-process.on('SIGINT', () => {
-  console.log('Closing database pool...');
-  pool.end();
+process.on('SIGTERM', () => {
+  if (!isClosingPool) {
+    isClosingPool = true;
+    console.log('Closing database pool...');
+    pool.end();
+  }
 });

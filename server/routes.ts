@@ -72,6 +72,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Check if we've reached the maximum allowed workouts
+      const workouts = await storage.getWorkouts(userId);
+      if (workouts.length >= 500) {
+        return res.status(400).json({
+          message: "Maximum workout history limit reached"
+        });
+      }
+
       const newWorkout = await storage.createWorkout(userId, workout);
 
       // Award EXP (1 hour = 3600 seconds = 1000 EXP)
