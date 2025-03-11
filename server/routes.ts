@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertWorkoutSchema } from "@shared/schema";
+import { storage } from "./storage.js";
+import { insertWorkoutSchema } from "@shared/schema.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Temporary debug endpoint - REMOVE AFTER DEPLOYMENT DEBUG
@@ -20,16 +20,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", async (req, res) => {
     try {
-      const { firebaseId, email, username } = req.body;
-      const existingUser = await storage.getUserByFirebaseId(firebaseId);
+      console.log('POST /api/users - Request body:', req.body);
+      const { id, email, username } = req.body;
+
+      // Debug log for incoming data
+      console.log('Attempting to create/fetch user with:', { id, email, username });
+
+      const existingUser = await storage.getUserByFirebaseId(id);
+      console.log('Existing user found:', existingUser);
 
       if (existingUser) {
         res.json(existingUser);
       } else {
-        const user = await storage.createUser(firebaseId, {
+        const user = await storage.createUser(id, {
           email,
           username
         });
+        console.log('Created new user:', user);
         res.status(201).json(user);
       }
     } catch (error) {

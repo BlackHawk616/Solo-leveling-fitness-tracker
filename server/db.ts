@@ -1,7 +1,7 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
-import * as schema from "@shared/schema";
+import * as schema from "@shared/schema.js";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -30,16 +30,16 @@ if (!poolUrl.includes('-pooler.')) {
 
 export const pool = new Pool({ 
   connectionString: poolUrl,
-  connectionTimeoutMillis: 10000, // Increased timeout
-  max: 10, // Reduced max connections
-  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-  allowExitOnIdle: true // Allow pool to exit when there are no connections
+  connectionTimeoutMillis: 10000,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  allowExitOnIdle: true
 });
 
 // Test the connection on startup
 pool.connect().then((client) => {
   console.log('Successfully connected to the database');
-  client.release(); // Important: release the client back to the pool
+  client.release();
 }).catch((err) => {
   console.error('Failed to connect to the database:', err.message);
   console.error('Please check your DATABASE_URL configuration');

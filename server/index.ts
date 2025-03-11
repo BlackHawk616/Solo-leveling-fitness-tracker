@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
 
 const app = express();
 app.use(express.json());
@@ -47,9 +47,6 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
@@ -57,7 +54,7 @@ app.use((req, res, next) => {
   }
 
   // Try to serve on port 5000, fallback to other ports if needed
-  let port = 5000;
+  let port = process.env.PORT || 5000;
 
   const startServer = (attemptPort: number) => {
     server.listen({
@@ -68,7 +65,7 @@ app.use((req, res, next) => {
       log(`serving on port ${attemptPort}`);
     }).on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
-        log(`Port ${attemptPort} is already in use, trying ${attemptPort + 1}`);
+        log(`Port ${attemptPort} is in use, trying ${attemptPort + 1}`);
         startServer(attemptPort + 1);
       } else {
         console.error('Server error:', err);
@@ -76,5 +73,5 @@ app.use((req, res, next) => {
     });
   };
 
-  startServer(port);
+  startServer(Number(port));
 })();
