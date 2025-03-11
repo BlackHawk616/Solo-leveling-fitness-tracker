@@ -220,22 +220,31 @@ export default function HomePage() {
 
     // Save initial state
     const saveTimerState = async () => {
+      // Extra check to ensure we're still tracking when this runs
+      if (!isTracking || !startTimeRef.current) return;
+      
       try {
         // Don't save if we hit the limit
         if (elapsedSeconds >= 6 * 60 * 60) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
+            timerRef.current = undefined;
           }
           setIsTracking(false);
+          setElapsedSeconds(0);
+          startTimeRef.current = undefined;
           await updateCurrentWorkout(null);
           return;
         }
 
-        await updateCurrentWorkout({
-          name: workoutName,
-          startTime: startTimeRef.current!.getTime(),
-          elapsedSeconds
-        });
+        // Only update if we're still tracking
+        if (isTracking && startTimeRef.current) {
+          await updateCurrentWorkout({
+            name: workoutName,
+            startTime: startTimeRef.current.getTime(),
+            elapsedSeconds
+          });
+        }
       } catch (error) {
         console.error('Failed to save timer state:', error);
       }
@@ -245,7 +254,9 @@ export default function HomePage() {
     saveTimerState();
     const saveInterval = setInterval(saveTimerState, 5000);
 
-    return () => clearInterval(saveInterval);
+    return () => {
+      clearInterval(saveInterval);
+    };
   }, [isTracking, workoutName, elapsedSeconds]);
 
   // Cleanup timer
@@ -318,22 +329,29 @@ export default function HomePage() {
     // Only proceed if we're actually tracking
     if (!isTracking) return;
 
-    // Capture the current elapsed seconds and workout name
-    const finalElapsedSeconds = elapsedSeconds;
-    const finalWorkoutName = workoutName;
-
-    // Clear the timer first
+    // First, set tracking to false to prevent any UI updates
+    setIsTracking(false);
+    
+    // Clear the timer and ensure it's gone
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
     }
     
-    // Immediately set tracking to false to update UI
-    setIsTracking(false);
-    // Reset elapsed seconds
+    // Capture the current elapsed seconds and workout name AFTER stopping timer
+    const finalElapsedSeconds = elapsedSeconds;
+    const finalWorkoutName = workoutName;
+    
+    // Fully reset all tracking state
     setElapsedSeconds(0);
-    // Reset start time reference
     startTimeRef.current = undefined;
+    
+    // Clear current workout immediately to prevent any background updates
+    try {
+      await updateCurrentWorkout(null);
+    } catch (error) {
+      console.error("Failed to clear current workout:", error);
+    }
 
     // Don't submit if elapsed time is too short
     if (finalElapsedSeconds < 1) {
