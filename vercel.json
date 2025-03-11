@@ -9,9 +9,12 @@
       }
     },
     {
-      "src": "client/package.json",
+      "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": {
+        "distDir": "dist/public",
+        "buildCommand": "npm run build"
+      }
     }
   ],
   "routes": [
@@ -20,8 +23,12 @@
       "dest": "server/index.ts"
     },
     {
-      "src": "/(.*)",
-      "dest": "client/index.html"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/((?!api/.*).*)",
+      "dest": "/index.html"
     }
   ]
 }
