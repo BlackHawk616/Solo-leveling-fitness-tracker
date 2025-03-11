@@ -9,10 +9,12 @@
         "includeFiles": [
           "shared/**/*",
           "server/**/*",
+          "client/**/*",
           "vite.config.ts",
           "package.json",
           "tsconfig.json"
-        ]
+        ],
+        "nodeVersion": "18.x"
       }
     },
     {
