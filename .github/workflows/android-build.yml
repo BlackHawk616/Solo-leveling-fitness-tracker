@@ -53,6 +53,12 @@ jobs:
           npx cap add android
           npx cap sync
 
+      - name: Configure Gradle Java version
+        run: |
+          echo "org.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
