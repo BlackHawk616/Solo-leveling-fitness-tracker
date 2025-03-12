@@ -183,42 +183,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/workouts", async (req, res) => {
     try {
       const { userId } = req.body;
-      const workout = insertWorkoutSchema.parse(req.body);
 
-      // Minimum workout duration: 30 seconds
-      if (workout.durationSeconds < 30) {
+      // Validate the workout data using the updated schema
+      try {
+        const workout = insertWorkoutSchema.parse(req.body);
+
+        // Ensure dates are valid
+        if (isNaN(workout.startedAt.getTime()) || isNaN(workout.endedAt.getTime())) {
+          return res.status(400).json({
+            message: "Invalid workout dates provided"
+          });
+        }
+
+        // Minimum workout duration: 30 seconds
+        if (workout.durationSeconds < 30) {
+          return res.status(400).json({ 
+            message: "Workout must be at least 30 seconds long" 
+          });
+        }
+
+        // Check daily limit (6 hours = 21600 seconds)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dailySeconds = await storage.getDailyWorkoutSeconds(userId, today);
+
+        if (dailySeconds + workout.durationSeconds > 21600) {
+          return res.status(400).json({
+            message: "Daily workout limit (6 hours) exceeded"
+          });
+        }
+
+        // Check if we've reached the maximum allowed workouts
+        const workouts = await storage.getWorkouts(userId);
+        if (workouts.length >= 500) {
+          return res.status(400).json({
+            message: "Maximum workout history limit reached"
+          });
+        }
+
+        console.log('Creating workout with data:', {
+          userId,
+          name: workout.name,
+          durationSeconds: workout.durationSeconds,
+          startedAt: workout.startedAt.toISOString(),
+          endedAt: workout.endedAt.toISOString()
+        });
+
+        const newWorkout = await storage.createWorkout(userId, workout);
+
+        // Award EXP (1 hour = 3600 seconds = 1000 EXP)
+        const expGained = Math.floor((workout.durationSeconds / 3600) * 1000);
+        const updatedUser = await storage.updateUserExp(userId, expGained);
+
+        console.log('Successfully created workout:', newWorkout);
+        res.status(201).json({ workout: newWorkout, user: updatedUser });
+      } catch (validationError) {
+        console.error('Validation error:', validationError);
         return res.status(400).json({ 
-          message: "Workout must be at least 30 seconds long" 
+          message: "Invalid workout data", 
+          error: validationError instanceof Error ? validationError.message : String(validationError)
         });
       }
-
-      // Check daily limit (6 hours = 21600 seconds)
-      const today = new Date();
-      const dailySeconds = await storage.getDailyWorkoutSeconds(userId, today);
-      if (dailySeconds + workout.durationSeconds > 21600) {
-        return res.status(400).json({
-          message: "Daily workout limit (6 hours) exceeded"
-        });
-      }
-
-      // Check if we've reached the maximum allowed workouts
-      const workouts = await storage.getWorkouts(userId);
-      if (workouts.length >= 500) {
-        return res.status(400).json({
-          message: "Maximum workout history limit reached"
-        });
-      }
-
-      const newWorkout = await storage.createWorkout(userId, workout);
-
-      // Award EXP (1 hour = 3600 seconds = 1000 EXP)
-      const expGained = Math.floor((workout.durationSeconds / 3600) * 1000);
-      const updatedUser = await storage.updateUserExp(userId, expGained);
-
-      res.status(201).json({ workout: newWorkout, user: updatedUser });
     } catch (error) {
       console.error('Workout creation error:', error);
-      res.status(500).json({ message: "Failed to create workout", error: error instanceof Error ? error.message : String(error) }); 
+      res.status(500).json({ 
+        message: "Failed to create workout", 
+        error: error instanceof Error ? error.message : String(error)
+      }); 
     }
   });
 

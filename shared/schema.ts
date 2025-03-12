@@ -30,19 +30,31 @@ export const insertUserSchema = createInsertSchema(users)
     email: z.string().email("Invalid email address")
   });
 
-export const insertWorkoutSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
-  startedAt: z.coerce.date(),
-  endedAt: z.coerce.date(),
-});
+// Updated workout schema with proper date validation
+export const insertWorkoutSchema = createInsertSchema(workouts)
+  .omit({ id: true })
+  .extend({
+    name: z.string().min(1, "Name is required"),
+    durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
+    startedAt: z.union([
+      z.date(),
+      z.string().transform((str) => new Date(str))
+    ]).refine((date) => !isNaN(date.getTime()), {
+      message: "Invalid date format"
+    }),
+    endedAt: z.union([
+      z.date(),
+      z.string().transform((str) => new Date(str))
+    ]).refine((date) => !isNaN(date.getTime()), {
+      message: "Invalid date format"
+    })
+  });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type InsertWorkout = z.infer<typeof insertWorkoutSchema>;
 
-// Ranking system constants
 export const ranks = [
   { name: "E Rank", minLevel: 1, maxLevel: 20 },
   { name: "D Rank", minLevel: 20, maxLevel: 40 },
