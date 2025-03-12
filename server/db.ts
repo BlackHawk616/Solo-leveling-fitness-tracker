@@ -8,7 +8,9 @@ console.log('Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
 
 // Set database URL from the TiDB Cloud connection string provided by the user
 // mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test
-const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
+// Force use of TiDB Cloud connection, ignoring environment variable
+console.log("Environment DATABASE_URL:", process.env.DATABASE_URL);
+const DATABASE_URL = "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
 
 if (!DATABASE_URL) {
   console.error('⚠️ DATABASE_URL environment variable is not set');
@@ -22,15 +24,26 @@ console.log('Using TiDB Cloud database credentials');
 // Parse the database URL to extract connection parameters
 const parseDbUrl = (url: string) => {
   try {
+    console.log('Parsing database URL, starts with:', url.substring(0, 15));
+    
     // Expected format: mysql://{username}:{password}@{hostname}:{port}/{database}
+    // TiDB Cloud format: mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test
     const regex = /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
     const match = url.match(regex);
     
     if (!match) {
+      console.error('❌ Connection string does not match the required pattern');
+      console.error(`❌ Received URL starts with: ${url.substring(0, 15)}...`);
       throw new Error('Invalid MySQL connection string format');
     }
     
     const [, user, password, host, port, database] = match;
+    
+    console.log(`✅ Parsed connection details:`);
+    console.log(`  - Host: ${host}`);
+    console.log(`  - Port: ${port}`);
+    console.log(`  - User: ${user}`);
+    console.log(`  - Database: ${database}`);
     
     return {
       host,
