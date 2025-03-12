@@ -12,9 +12,10 @@
           "client/**/*",
           "vite.config.ts",
           "package.json",
-          "tsconfig.json"
+          "tsconfig.json",
+          "tsconfig.vercel.json"
         ],
-        "nodeVersion": "18.x"
+        "nodeVersion": "20.x"
       }
     },
     {

@@ -2,13 +2,17 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "moduleResolution": "Node",
+    "moduleResolution": "NodeNext",
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["client/src/*"],
-      "@shared/*": ["shared/*"]
-    }
+      "@/*": ["./client/src/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node", "vite/client"]
   },
   "include": ["client/**/*", "server/**/*", "shared/**/*"],
   "exclude": ["node_modules"]
