@@ -2,8 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { insertWorkoutSchema } from "../shared/schema.js";
+import { registerDebugRoutes } from "./debug-routes.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register debug routes
+  registerDebugRoutes(app);
+  
   // Debug endpoint to check environment
   app.get('/api/debug-env', (req, res) => {
     console.log('Debug environment request received');
