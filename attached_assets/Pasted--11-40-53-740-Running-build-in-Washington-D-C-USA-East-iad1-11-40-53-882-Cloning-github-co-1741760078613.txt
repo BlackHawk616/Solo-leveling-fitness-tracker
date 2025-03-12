@@ -1,0 +1,237 @@
+[11:40:53.740] Running build in Washington, D.C., USA (East) – iad1
+[11:40:53.882] Cloning github.com/BlackHawk616/Solo-Leveling-Fitness-Tracker (Branch: main, Commit: c213176)
+[11:40:55.279] Cloning completed: 1.396s
+[11:40:56.717] Restored build cache from previous deployment (8ru81iDMD3fvWaFjPuCLjVs9emc4)
+[11:40:56.799] Running "vercel build"
+[11:40:57.177] Vercel CLI 41.3.2
+[11:40:57.336] WARN! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
+[11:40:58.996] Installing dependencies...
+[11:41:01.750] npm warn EBADENGINE Unsupported engine {
+[11:41:01.751] npm warn EBADENGINE   package: '@capacitor/cli@7.0.1',
+[11:41:01.751] npm warn EBADENGINE   required: { node: '>=20.0.0' },
+[11:41:01.751] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.751] npm warn EBADENGINE }
+[11:41:01.754] npm warn EBADENGINE Unsupported engine {
+[11:41:01.754] npm warn EBADENGINE   package: 'rimraf@6.0.1',
+[11:41:01.754] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.755] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.755] npm warn EBADENGINE }
+[11:41:01.755] npm warn EBADENGINE Unsupported engine {
+[11:41:01.755] npm warn EBADENGINE   package: 'glob@11.0.1',
+[11:41:01.755] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.756] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.756] npm warn EBADENGINE }
+[11:41:01.756] npm warn EBADENGINE Unsupported engine {
+[11:41:01.756] npm warn EBADENGINE   package: 'jackspeak@4.1.0',
+[11:41:01.756] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.757] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.757] npm warn EBADENGINE }
+[11:41:01.757] npm warn EBADENGINE Unsupported engine {
+[11:41:01.757] npm warn EBADENGINE   package: 'lru-cache@11.0.2',
+[11:41:01.757] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.758] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.758] npm warn EBADENGINE }
+[11:41:01.758] npm warn EBADENGINE Unsupported engine {
+[11:41:01.758] npm warn EBADENGINE   package: 'minimatch@10.0.1',
+[11:41:01.758] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.762] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.762] npm warn EBADENGINE }
+[11:41:01.762] npm warn EBADENGINE Unsupported engine {
+[11:41:01.763] npm warn EBADENGINE   package: 'path-scurry@2.0.0',
+[11:41:01.763] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:41:01.763] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:41:01.763] npm warn EBADENGINE }
+[11:41:02.474] 
+[11:41:02.475] up to date in 3s
+[11:41:02.475] 
+[11:41:02.476] 69 packages are looking for funding
+[11:41:02.476]   run `npm fund` for details
+[11:41:02.488] Running "npm run build"
+[11:41:02.838] 
+[11:41:02.840] > rest-express@1.0.0 build
+[11:41:02.840] > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --tsconfig=tsconfig.vercel.json --alias:@=./client/src --alias:@shared=./shared
+[11:41:02.840] 
+[11:41:04.052] [36mvite v5.4.14 [32mbuilding for production...[36m[39m
+[11:41:04.117] transforming...
+[11:41:10.706] [32m✓[39m 2086 modules transformed.
+[11:41:11.211] rendering chunks...
+[11:41:11.230] computing gzip size...
+[11:41:11.256] [2m../dist/public/[22m[32mindex.html                 [39m[1m[2m  1.87 kB[22m[1m[22m[2m │ gzip:   0.71 kB[22m
+[11:41:11.257] [2m../dist/public/[22m[2massets/[22m[35mindex-DOlvsUj-.css  [39m[1m[2m 58.33 kB[22m[1m[22m[2m │ gzip:  10.52 kB[22m
+[11:41:11.258] [2m../dist/public/[22m[2massets/[22m[36mindex-Ch-8vtn3.js   [39m[1m[33m847.93 kB[39m[22m[2m │ gzip: 225.63 kB[22m
+[11:41:11.258] [33m
+[11:41:11.258] (!) Some chunks are larger than 500 kB after minification. Consider:
+[11:41:11.258] - Using dynamic import() to code-split the application
+[11:41:11.258] - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+[11:41:11.259] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[11:41:11.259] [32m✓ built in 7.18s[39m
+[11:41:11.311] 
+[11:41:11.311]   dist/index.js  17.0kb
+[11:41:11.311] 
+[11:41:11.311] ⚡ Done in 5ms
+[11:41:11.568] Using TypeScript 5.6.3 (local user-provided)
+[11:41:22.347] client/src/App.tsx(3,32): error TS2307: Cannot find module '@/lib/protected-route' or its corresponding type declarations.
+[11:41:22.347] client/src/App.tsx(4,22): error TS2307: Cannot find module '@/pages/home-page' or its corresponding type declarations.
+[11:41:22.347] client/src/App.tsx(5,22): error TS2307: Cannot find module '@/pages/auth-page' or its corresponding type declarations.
+[11:41:22.348] client/src/App.tsx(6,39): error TS2307: Cannot find module '@/hooks/use-auth' or its corresponding type declarations.
+[11:41:22.348] client/src/App.tsx(7,25): error TS2307: Cannot find module '@/components/ui/toaster' or its corresponding type declarations.
+[11:41:22.348] 
+[11:41:22.365] client/src/main.tsx(3,17): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './App.jsx'?
+[11:41:22.366] 
+[11:41:22.474] client/src/hooks/use-auth.tsx(10,38): error TS2307: Cannot find module '@/lib/firebase' or its corresponding type declarations.
+[11:41:22.474] client/src/hooks/use-auth.tsx(11,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+[11:41:22.474] client/src/hooks/use-auth.tsx(12,31): error TS2307: Cannot find module '@/lib/firebase' or its corresponding type declarations.
+[11:41:22.475] 
+[11:41:22.769] client/src/lib/protected-route.tsx(3,25): error TS2307: Cannot find module '@/hooks/use-auth' or its corresponding type declarations.
+[11:41:22.770] 
+[11:41:22.868] client/src/pages/auth-page.tsx(1,25): error TS2307: Cannot find module '@/hooks/use-auth' or its corresponding type declarations.
+[11:41:22.868] client/src/pages/auth-page.tsx(2,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:22.868] client/src/pages/auth-page.tsx(3,70): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+[11:41:22.868] 
+[11:41:23.176] client/src/pages/home-page.tsx(1,25): error TS2307: Cannot find module '@/hooks/use-auth' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(2,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(9,8): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(10,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(11,26): error TS2307: Cannot find module '@/components/ui/progress' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(14,62): error TS2307: Cannot find module '@shared/schema' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(15,44): error TS2307: Cannot find module '@/lib/workout' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(18,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(19,34): error TS2307: Cannot find module '@/lib/sounds' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(20,43): error TS2307: Cannot find module '@/lib/firebase' or its corresponding type declarations.
+[11:41:23.177] client/src/pages/home-page.tsx(396,21): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ readonly "E Rank": { readonly icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; readonly color: "text-gray-400"; readonly bg: "bg-gray-400/10"; }; ... 11 more ...; readonly "Sung Jinwo": { ...; }; }'.
+[11:41:23.177] client/src/pages/home-page.tsx(423,34): error TS7006: Parameter 'e' implicitly has an 'any' type.
+[11:41:23.177] client/src/pages/home-page.tsx(514,29): error TS7006: Parameter 'e' implicitly has an 'any' type.
+[11:41:23.177] client/src/pages/home-page.tsx(590,26): error TS7006: Parameter 'rankInfo' implicitly has an 'any' type.
+[11:41:23.178] client/src/pages/home-page.tsx(591,31): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ readonly "E Rank": { readonly icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; readonly color: "text-gray-400"; readonly bg: "bg-gray-400/10"; }; ... 11 more ...; readonly "Sung Jinwo": { ...; }; }'.
+[11:41:23.178] 
+[11:41:23.234] client/src/pages/not-found.tsx(1,35): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+[11:41:23.234] 
+[11:41:23.863] client/src/components/ui/accordion.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:23.863] 
+[11:41:23.983] client/src/components/ui/alert-dialog.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:23.983] client/src/components/ui/alert-dialog.tsx(5,32): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:23.983] 
+[11:41:24.031] client/src/components/ui/alert.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.031] 
+[11:41:24.076] client/src/components/ui/avatar.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.076] 
+[11:41:24.092] client/src/components/ui/badge.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.093] 
+[11:41:24.217] client/src/components/ui/breadcrumb.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.217] 
+[11:41:24.241] client/src/components/ui/button.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.243] 
+[11:41:24.259] client/src/components/ui/calendar.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.259] client/src/components/ui/calendar.tsx(6,32): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:24.259] 
+[11:41:24.283] client/src/components/ui/card.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.284] 
+[11:41:24.346] client/src/components/ui/carousel.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.347] client/src/components/ui/carousel.tsx(8,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:24.347] 
+[11:41:24.514] client/src/components/ui/chart.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.515] 
+[11:41:24.539] client/src/components/ui/checkbox.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.540] 
+[11:41:24.805] client/src/components/ui/command.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.806] client/src/components/ui/command.tsx(7,39): error TS2307: Cannot find module '@/components/ui/dialog' or its corresponding type declarations.
+[11:41:24.807] 
+[11:41:24.978] client/src/components/ui/context-menu.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:24.978] 
+[11:41:25.023] client/src/components/ui/dialog.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.023] 
+[11:41:25.059] client/src/components/ui/drawer.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.060] 
+[11:41:25.173] client/src/components/ui/dropdown-menu.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.173] 
+[11:41:25.536] client/src/components/ui/form.tsx(13,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.537] client/src/components/ui/form.tsx(14,23): error TS2307: Cannot find module '@/components/ui/label' or its corresponding type declarations.
+[11:41:25.537] 
+[11:41:25.567] client/src/components/ui/hover-card.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.567] 
+[11:41:25.670] client/src/components/ui/input-otp.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.671] 
+[11:41:25.702] client/src/components/ui/input.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.702] 
+[11:41:25.717] client/src/components/ui/label.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.718] 
+[11:41:25.836] client/src/components/ui/menubar.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.840] 
+[11:41:25.912] client/src/components/ui/navigation-menu.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.912] 
+[11:41:25.961] client/src/components/ui/pagination.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.962] client/src/components/ui/pagination.tsx(5,45): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:25.962] client/src/components/ui/pagination.tsx(68,5): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+[11:41:25.962] client/src/components/ui/pagination.tsx(84,5): error TS2783: 'size' is specified more than once, so this usage will be overwritten.
+[11:41:25.963] 
+[11:41:25.977] client/src/components/ui/popover.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.977] 
+[11:41:25.990] client/src/components/ui/progress.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:25.991] 
+[11:41:26.025] client/src/components/ui/radio-group.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.026] 
+[11:41:26.057] client/src/components/ui/resizable.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.057] 
+[11:41:26.093] client/src/components/ui/scroll-area.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.093] 
+[11:41:26.202] client/src/components/ui/select.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.202] 
+[11:41:26.221] client/src/components/ui/separator.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.221] 
+[11:41:26.259] client/src/components/ui/sheet.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.259] 
+[11:41:26.561] client/src/components/ui/sidebar.tsx(6,29): error TS2307: Cannot find module '@/hooks/use-mobile' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(8,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(9,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(10,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(11,37): error TS2307: Cannot find module '@/components/ui/sheet' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(12,26): error TS2307: Cannot find module '@/components/ui/skeleton' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(18,8): error TS2307: Cannot find module '@/components/ui/tooltip' or its corresponding type declarations.
+[11:41:26.562] client/src/components/ui/sidebar.tsx(274,17): error TS7006: Parameter 'event' implicitly has an 'any' type.
+[11:41:26.562] 
+[11:41:26.571] client/src/components/ui/skeleton.tsx(1,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.571] 
+[11:41:26.601] client/src/components/ui/slider.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.602] 
+[11:41:26.618] client/src/components/ui/switch.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.619] 
+[11:41:26.714] client/src/components/ui/table.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.715] 
+[11:41:26.755] client/src/components/ui/tabs.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.755] 
+[11:41:26.765] client/src/components/ui/textarea.tsx(3,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.765] 
+[11:41:26.839] client/src/components/ui/toast.tsx(6,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.839] 
+[11:41:26.851] client/src/components/ui/toaster.tsx(1,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+[11:41:26.851] client/src/components/ui/toaster.tsx(9,8): error TS2307: Cannot find module '@/components/ui/toast' or its corresponding type declarations.
+[11:41:26.851] client/src/components/ui/toaster.tsx(16,31): error TS7031: Binding element 'id' implicitly has an 'any' type.
+[11:41:26.851] client/src/components/ui/toaster.tsx(16,35): error TS7031: Binding element 'title' implicitly has an 'any' type.
+[11:41:26.851] client/src/components/ui/toaster.tsx(16,42): error TS7031: Binding element 'description' implicitly has an 'any' type.
+[11:41:26.851] client/src/components/ui/toaster.tsx(16,55): error TS7031: Binding element 'action' implicitly has an 'any' type.
+[11:41:26.851] 
+[11:41:26.897] client/src/components/ui/toggle-group.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.898] client/src/components/ui/toggle-group.tsx(6,32): error TS2307: Cannot find module '@/components/ui/toggle' or its corresponding type declarations.
+[11:41:26.898] client/src/components/ui/toggle-group.tsx(20,4): error TS2322: Type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; } | { children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' is not assignable to type 'IntrinsicAttributes & ((ToggleGroupSingleProps | ToggleGroupMultipleProps) & RefAttributes<HTMLDivElement>)'.
+[11:41:26.898]   Type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' is not assignable to type 'IntrinsicAttributes & ((ToggleGroupSingleProps | ToggleGroupMultipleProps) & RefAttributes<HTMLDivElement>)'.
+[11:41:26.899]     Property 'type' is missing in type '{ children: Element; ref: ForwardedRef<HTMLDivElement>; className: any; }' but required in type 'ToggleGroupMultipleProps'.
+[11:41:26.899] client/src/components/ui/toggle-group.tsx(41,6): error TS2741: Property 'value' is missing in type '{ children: any; ref: ForwardedRef<HTMLButtonElement>; className: any; }' but required in type 'Omit<ToggleGroupItemImplProps, "pressed">'.
+[11:41:26.899] 
+[11:41:26.911] client/src/components/ui/toggle.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.912] 
+[11:41:26.926] client/src/components/ui/tooltip.tsx(4,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+[11:41:26.926] 
+[11:41:27.088] client/src/hooks/use-toast.ts(6,8): error TS2307: Cannot find module '@/components/ui/toast' or its corresponding type declarations.
+[11:41:27.088] client/src/hooks/use-toast.ts(158,22): error TS7006: Parameter 'open' implicitly has an 'any' type.
+[11:41:27.089] 
+[11:41:27.253] client/src/lib/user.ts(2,20): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './firebase.js'?
+[11:41:27.253] client/src/lib/user.ts(3,31): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './firebase.js'?
+[11:41:27.254] client/src/lib/user.ts(4,22): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './firebase.js'?
+[11:41:27.254] 
+[11:41:35.611] Build Completed in /vercel/output [37s]
+[11:41:36.019] Deploying outputs...
+[11:41:46.436] 
+[11:41:46.759] Deployment completed
+[11:42:06.785] Uploading build cache [63.03 MB]...
+[11:42:07.797] Build cache uploaded: 1.011s
