@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 
 export function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -13,6 +13,16 @@ export function formatDuration(seconds: number): string {
   return parts.join(" ");
 }
 
-export function formatDate(date: Date): string {
-  return format(date, "MMM d, yyyy h:mm a");
+export function formatDate(date: Date | string): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) {
+      console.error('Invalid date:', date);
+      return 'Invalid date';
+    }
+    return format(dateObj, "MMM d, yyyy h:mm a");
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
 }
