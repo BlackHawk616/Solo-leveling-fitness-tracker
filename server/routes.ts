@@ -128,14 +128,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (process.env.DATABASE_URL) {
               console.error('🔍 DATABASE_URL length:', process.env.DATABASE_URL.length);
               console.error('🔍 DATABASE_URL format check:', 
-                process.env.DATABASE_URL.startsWith('postgres://') || 
-                process.env.DATABASE_URL.startsWith('postgresql://') ? 'Valid format' : 'Invalid format');
-              console.error('🔍 DATABASE_URL SSL mode:', 
-                process.env.DATABASE_URL.includes('sslmode=require') ? 'SSL required' : 'SSL not specified');
+                process.env.DATABASE_URL.startsWith('mysql://') ? 'Valid format' : 'Invalid format');
             }
             return res.status(503).json({ 
-              message: "Database connection error after multiple attempts", 
-              error: dbError instanceof Error ? dbError.message : String(dbError),
+              message: "Failed to establish database connection", 
               environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other', 
               nodeEnv: process.env.NODE_ENV || 'development'
             });

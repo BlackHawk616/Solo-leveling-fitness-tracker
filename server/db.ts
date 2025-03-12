@@ -1,3 +1,4 @@
+
 import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
 import * as schema from "../shared/schema.js";
@@ -6,11 +7,9 @@ import * as schema from "../shared/schema.js";
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
 
-// Set database URL from the TiDB Cloud connection string provided by the user
-// mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test
-// Force use of TiDB Cloud connection, ignoring environment variable
-console.log("Environment DATABASE_URL:", process.env.DATABASE_URL);
-const DATABASE_URL = "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
+// Load database URL from environment or use the hardcoded value
+const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
+console.log("Using DATABASE_URL:", DATABASE_URL.substring(0, 15) + "...");
 
 if (!DATABASE_URL) {
   console.error('⚠️ DATABASE_URL environment variable is not set');
@@ -19,15 +18,12 @@ if (!DATABASE_URL) {
   );
 }
 
-console.log('Using TiDB Cloud database credentials');
-
 // Parse the database URL to extract connection parameters
 const parseDbUrl = (url: string) => {
   try {
     console.log('Parsing database URL, starts with:', url.substring(0, 15));
     
     // Expected format: mysql://{username}:{password}@{hostname}:{port}/{database}
-    // TiDB Cloud format: mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test
     const regex = /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
     const match = url.match(regex);
     
@@ -58,18 +54,15 @@ const parseDbUrl = (url: string) => {
   }
 };
 
-console.log('Attempting to connect to TiDB database...');
-console.log('Database URL format:', DATABASE_URL.substring(0, 20) + '...');
-
 // Create connection with retry logic
-const createConnection = async (retries = 3): Promise<mysql.Pool> => {
+const createConnection = async (retries = 5): Promise<mysql.Pool> => {
   // Special handling for Vercel's serverless environment
   const isVercel = process.env.VERCEL === '1';
   
   try {
     const connectionConfig = parseDbUrl(DATABASE_URL);
     
-    // Create connection pool
+    // Create connection pool with TiDB-specific settings
     const pool = mysql.createPool({
       host: connectionConfig.host,
       port: connectionConfig.port,
@@ -77,18 +70,30 @@ const createConnection = async (retries = 3): Promise<mysql.Pool> => {
       password: connectionConfig.password,
       database: connectionConfig.database,
       waitForConnections: true,
-      connectionLimit: isVercel ? 1 : 10, // Lower connection limit in Vercel
-      maxIdle: isVercel ? 1 : 10, // Lower max idle connections in Vercel
-      idleTimeout: 60000, // 60 seconds
+      connectionLimit: isVercel ? 1 : 5, // Lower connection limit for serverless
+      maxIdle: isVercel ? 1 : 5,
+      idleTimeout: 30000, // 30 seconds
       enableKeepAlive: true,
-      keepAliveInitialDelay: 0,
-      ssl: {} // Enable SSL
+      keepAliveInitialDelay: 10000,
+      ssl: {}, // Enable SSL for TiDB Cloud
+      connectTimeout: 10000, // 10 seconds
+      timezone: '+00:00' // UTC timezone
     });
     
-    // Verify connection works
+    // Verify connection works with a simple query
     const connection = await pool.getConnection();
-    console.log('✅ Successfully connected to the TiDB database!');
-    connection.release();
+    try {
+      // Run test query to verify connection
+      const [rows] = await connection.query('SELECT 1 AS connected');
+      if (Array.isArray(rows) && rows.length > 0) {
+        console.log('✅ Successfully connected to the TiDB database!');
+        console.log('✅ Test query result:', rows);
+      } else {
+        console.warn('⚠️ Database connection test query returned unexpected result:', rows);
+      }
+    } finally {
+      connection.release();
+    }
     
     return pool;
   } catch (err: any) {
@@ -96,7 +101,7 @@ const createConnection = async (retries = 3): Promise<mysql.Pool> => {
     
     if (retries > 0) {
       // Use exponential backoff for retries
-      const delay = Math.min(2000 * (2 ** (3 - retries)), 10000);
+      const delay = Math.min(2000 * (2 ** (5 - retries)), 10000);
       console.log(`🔄 Retrying database connection in ${delay/1000} seconds...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return createConnection(retries - 1);
@@ -108,7 +113,7 @@ const createConnection = async (retries = 3): Promise<mysql.Pool> => {
   }
 };
 
-// Export the pool and db with lazy initialization to help with Vercel cold starts
+// Export the pool and db with lazy initialization
 let _pool: mysql.Pool | null = null;
 let _db: any = null;
 
@@ -125,6 +130,23 @@ export const getDb = async () => {
     _db = drizzle(pool, { schema, mode: 'default' });
   }
   return _db;
+};
+
+// Simple function to check if the database connection is working
+export const checkDatabaseConnection = async (attempts = 1): Promise<boolean> => {
+  try {
+    const pool = await getPool();
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query('SELECT 1 AS connected');
+      return Array.isArray(rows) && rows.length > 0;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error(`❌ Database check failed (attempt ${attempts}):`, error);
+    return false;
+  }
 };
 
 // Compatibility layer for the rest of the application
