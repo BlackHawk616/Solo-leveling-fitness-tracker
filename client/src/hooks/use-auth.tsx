@@ -217,32 +217,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await signInWithPopup(auth, googleProvider);
         console.log('Google authentication successful, user:', result.user.uid);
         
-        try {
-          console.log('Fetching user data from backend');
-          const userData = await fetchUserData(result.user);
-          console.log('User data fetched successfully');
+        // Set the Firebase user immediately to avoid auth state issues
+        setFirebaseUser(result.user);
+        
+        // Make multiple attempts to fetch user data
+        let userData = null;
+        let fetchError = null;
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            console.log(`Fetching user data from backend (attempt ${attempt})`);
+            userData = await fetchUserData(result.user);
+            console.log('User data fetched successfully on attempt', attempt);
+            break; // Exit loop if successful
+          } catch (fetchErr) {
+            console.error(`Error fetching user data (attempt ${attempt}):`, fetchErr);
+            fetchError = fetchErr;
+            // Wait a bit before trying again
+            if (attempt < 3) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+          }
+        }
+        
+        if (userData) {
+          // Successfully got user data
           setUser(userData);
           return { firebaseUser: result.user, userData };
-        } catch (fetchErr) {
-          console.error('Error fetching user data after successful Google login:', fetchErr);
-          // Still set the Firebase user even if DB fetch fails
-          setFirebaseUser(result.user);
-          // Don't throw error here to allow login to continue
-          setUser({
+        } else {
+          // Create a fallback user object
+          console.log('Using fallback user data after fetch failures');
+          const fallbackUser = {
             id: result.user.uid,
-            email: result.user.email,
+            email: result.user.email || 'unknown@example.com',
             username: result.user.displayName || 'User',
             level: 1,
             exp: 0,
             totalWorkoutSeconds: 0,
             currentWorkout: null
-          });
+          };
+          
+          // Try a direct user creation as last resort
+          try {
+            console.log('Attempting direct user creation as fallback');
+            const response = await fetch('/api/users', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                id: result.user.uid,
+                email: result.user.email || 'unknown@example.com',
+                username: result.user.displayName || 'User',
+              })
+            });
+            
+            if (response.ok) {
+              const createdUser = await response.json();
+              console.log('Direct user creation successful:', createdUser);
+              setUser(createdUser);
+              return { firebaseUser: result.user, userData: createdUser };
+            } else {
+              console.error('Direct user creation failed:', await response.text());
+            }
+          } catch (createErr) {
+            console.error('Error in direct user creation:', createErr);
+          }
+          
+          // Fall back to client-side user if all attempts fail
+          setUser(fallbackUser);
           toast({
             variant: "warning",
             title: "Partial login successful",
-            description: "You're logged in but we couldn't retrieve your profile data. Some features may be limited.",
+            description: "You're logged in but we couldn't fully sync your profile. Some features may be limited.",
           });
-          return { firebaseUser: result.user, userData: null };
+          return { firebaseUser: result.user, userData: fallbackUser };
         }
       } catch (err) {
         console.error('Google sign-in error:', err);
@@ -258,7 +307,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Login mutation successful with data:', data?.userData ? 'User data present' : 'No user data');
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
@@ -266,6 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['user'] });
     },
     onError: (error: Error) => {
+      console.error('Login mutation error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
