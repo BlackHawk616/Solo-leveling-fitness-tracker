@@ -30,12 +30,14 @@ export const insertUserSchema = createInsertSchema(users)
     email: z.string().email("Invalid email address")
   });
 
-// Updated workout schema with proper date validation
+// Updated workout schema with proper date validation and numeric check
 export const insertWorkoutSchema = createInsertSchema(workouts)
   .omit({ id: true })
   .extend({
     name: z.string().min(1, "Name is required"),
-    durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
+    durationSeconds: z.number()
+      .min(1, "Workout must be at least 1 second")
+      .refine(val => !isNaN(val), "Duration must be a valid number"),
     startedAt: z.union([
       z.date(),
       z.string().transform((str) => {

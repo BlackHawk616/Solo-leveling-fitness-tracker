@@ -163,9 +163,27 @@ export class DatabaseStorage implements IStorage {
       if (!users || users.length === 0) throw new Error("User not found");
       const user = users[0] as User;
 
+      // Ensure totalWorkoutSeconds is a valid number before adding
+      const currentTotal = typeof user.totalWorkoutSeconds === 'number' && !isNaN(user.totalWorkoutSeconds) 
+        ? user.totalWorkoutSeconds 
+        : 0;
+      
+      const durationToAdd = typeof workout.durationSeconds === 'number' && !isNaN(workout.durationSeconds)
+        ? workout.durationSeconds
+        : 0;
+      
+      const newTotal = currentTotal + durationToAdd;
+      
+      console.log('Updating total workout seconds:', {
+        userId,
+        currentTotal,
+        durationToAdd,
+        newTotal
+      });
+      
       await pool.query(
         'UPDATE users SET total_workout_seconds = ? WHERE id = ?',
-        [user.totalWorkoutSeconds + workout.durationSeconds, userId]
+        [newTotal, userId]
       );
 
       const [workouts] = await pool.query(

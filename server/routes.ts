@@ -184,8 +184,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
 
+      // Log the raw request data for debugging
+      console.log('Received workout request data:', {
+        body: req.body,
+        userId: req.body.userId,
+        durationSeconds: req.body.durationSeconds,
+        startedAt: req.body.startedAt,
+        endedAt: req.body.endedAt
+      });
+
       // Validate the workout data using the updated schema
       try {
+        // Ensure durationSeconds is a number
+        if (typeof req.body.durationSeconds !== 'number') {
+          req.body.durationSeconds = parseInt(req.body.durationSeconds, 10);
+          if (isNaN(req.body.durationSeconds)) {
+            throw new Error('Duration must be a valid number');
+          }
+        }
+
         const workout = insertWorkoutSchema.parse(req.body);
 
         // Check daily limit (6 hours = 21600 seconds)
@@ -207,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        console.log('Creating workout with data:', {
+        console.log('Creating workout with validated data:', {
           userId,
           name: workout.name,
           durationSeconds: workout.durationSeconds,
