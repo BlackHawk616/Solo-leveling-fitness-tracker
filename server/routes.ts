@@ -202,7 +202,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error('Duration must be a valid number');
           }
         }
-
+        
+        // Log the duration for debugging
+        console.log('Workout duration in seconds:', req.body.durationSeconds);
+        
+        // Make sure we have proper dates
+        if (typeof req.body.startedAt === 'string' || typeof req.body.startedAt === 'number') {
+          req.body.startedAt = new Date(req.body.startedAt);
+        }
+        
+        if (typeof req.body.endedAt === 'string' || typeof req.body.endedAt === 'number') {
+          req.body.endedAt = new Date(req.body.endedAt);
+        }
+        
         const workout = insertWorkoutSchema.parse(req.body);
 
         // Check daily limit (6 hours = 21600 seconds)

@@ -386,12 +386,18 @@ export default function HomePage() {
       setWorkoutName("");
       return;
     }
+    
+    console.log("Submitting workout with duration:", finalElapsedSeconds);
 
     try {
-      await workoutMutation.mutateAsync({
+      console.log("Starting workout save with duration:", finalElapsedSeconds);
+      
+      const response = await workoutMutation.mutateAsync({
         name: finalWorkoutName,
         durationSeconds: finalElapsedSeconds
       });
+      
+      console.log("Workout saved successfully:", response);
 
       // Clear the current workout
       await updateCurrentWorkout(null);
