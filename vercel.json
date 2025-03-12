@@ -46,18 +46,6 @@
       "dest": "/index.html"
     }
   ],
-  "env": {
-    "NODE_ENV": "production",
-    "VERCEL": "1"
-  },
-  "buildEnvironment": {
-    "NODE_VERSION": "18.x"
-  },
-  "regions": ["iad1"],
-  "functions": {
-    "server/index.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
+
   }
 }
