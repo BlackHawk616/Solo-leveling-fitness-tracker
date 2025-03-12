@@ -25,13 +25,17 @@ console.log('Using Neon database credentials provided by user');
 console.log('Attempting to connect to database...');
 console.log('Database URL format:', poolUrl.substring(0, 20) + '...' + (poolUrl.includes('sslmode=require') ? ' (with SSL)' : ' (without SSL)'));
 
-// Create connection pool with retry logic
+// Create connection pool with retry logic and special Vercel handling
 const createPool = (retries = 3): Promise<Pool> => {
+  // Special handling for Vercel's serverless environment
+  const isVercel = process.env.VERCEL === '1';
+  
   const pool = new Pool({ 
     connectionString: poolUrl,
-    connectionTimeoutMillis: 15000,  // Increased timeout for Vercel
-    max: 10,
+    connectionTimeoutMillis: isVercel ? 30000 : 15000,  // Longer timeout for Vercel
+    max: isVercel ? 1 : 10,  // Lower max connections on Vercel
     idleTimeoutMillis: 30000,
+    ssl: { rejectUnauthorized: false }, // Important for Vercel
     allowExitOnIdle: true
   });
 

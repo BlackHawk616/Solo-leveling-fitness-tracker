@@ -49,6 +49,30 @@ app.use((req, res, next) => {
 
 (async () => {
   console.log('Starting server...');
+  
+  // Log environment information
+  console.log('📊 Environment:', process.env.NODE_ENV || 'development');
+  console.log('🌐 Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
+  
+  // Log important environment variables (without revealing secrets)
+  console.log('🔍 DATABASE_URL configured:', !!process.env.DATABASE_URL);
+  if (process.env.DATABASE_URL) {
+    const urlPrefix = process.env.DATABASE_URL.substring(0, 20);
+    console.log('🔍 DATABASE_URL prefix:', urlPrefix + '...');
+    console.log('🔍 DATABASE_URL contains SSL mode:', process.env.DATABASE_URL.includes('sslmode=require'));
+  }
+  
+  // Create a special header for Vercel deployments
+  if (process.env.VERCEL === '1') {
+    app.use((req, res, next) => {
+      // Add custom headers to help debug requests on Vercel
+      req.headers['x-deployment-env'] = 'vercel';
+      // Track request start time for performance monitoring
+      req.headers['x-request-start'] = Date.now().toString();
+      next();
+    });
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

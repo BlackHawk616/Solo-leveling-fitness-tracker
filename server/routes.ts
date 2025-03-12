@@ -77,7 +77,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: req.headers,
         method: req.method,
         url: req.url,
-        ip: req.ip
+        ip: req.ip,
+        isVercel: process.env.VERCEL === '1' ? 'Yes' : 'No',
+        nodeEnv: process.env.NODE_ENV || 'development'
       });
 
       // Log authorization header if present
@@ -102,39 +104,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let dbPool = null;
 
       // Try connecting to database with several attempts
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let attempt = 1; attempt <= 5; attempt++) {  // Increased to 5 attempts
         try {
           console.log(`🔌 Checking database connection (attempt ${attempt})...`);
           const { getPool } = await import('./db.js');
           dbPool = await getPool();
-          await dbPool.query('SELECT 1');
-          console.log('✅ Database connection verified before user operation');
-          dbConnectionOk = true;
-          break;
+          
+          // Extra verification of database connection
+          const testResult = await dbPool.query('SELECT 1 AS test');
+          if (testResult.rows && testResult.rows.length > 0) {
+            console.log('✅ Database connection fully verified with test query:', testResult.rows[0]);
+            dbConnectionOk = true;
+            break;
+          } else {
+            console.error('⚠️ Database connection test query returned no results');
+            // Continue to next attempt
+          }
         } catch (dbError) {
           console.error(`❌ Database connection failed (attempt ${attempt}):`, dbError);
 
-          if (attempt === 3) {
+          if (attempt === 5) {
             console.error('🔍 DATABASE_URL present:', !!process.env.DATABASE_URL);
             if (process.env.DATABASE_URL) {
               console.error('🔍 DATABASE_URL length:', process.env.DATABASE_URL.length);
               console.error('🔍 DATABASE_URL format check:', 
                 process.env.DATABASE_URL.startsWith('postgres://') || 
                 process.env.DATABASE_URL.startsWith('postgresql://') ? 'Valid format' : 'Invalid format');
+              console.error('🔍 DATABASE_URL SSL mode:', 
+                process.env.DATABASE_URL.includes('sslmode=require') ? 'SSL required' : 'SSL not specified');
             }
             return res.status(503).json({ 
               message: "Database connection error after multiple attempts", 
-              error: dbError instanceof Error ? dbError.message : String(dbError) 
+              error: dbError instanceof Error ? dbError.message : String(dbError),
+              environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other', 
+              nodeEnv: process.env.NODE_ENV || 'development'
             });
           }
 
-          // Wait before next attempt
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          // Exponential backoff with jitter
+          const baseDelay = Math.min(1000 * (2 ** attempt), 8000);
+          const jitter = Math.floor(Math.random() * 1000);
+          const delay = baseDelay + jitter;
+          console.log(`🔄 Retrying database connection in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
       if (!dbConnectionOk) {
-        return res.status(503).json({ message: "Failed to establish database connection" });
+        return res.status(503).json({ 
+          message: "Failed to establish database connection", 
+          environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+          nodeEnv: process.env.NODE_ENV || 'development'
+        });
       }
 
       // Now proceed with user lookup/creation with transaction for data consistency
@@ -285,11 +306,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/workouts/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const workouts = await storage.getWorkouts(userId);
-      res.json(workouts);
+      
+      // Log request details in Vercel environment
+      if (process.env.VERCEL === '1') {
+        console.log('🔍 Get workouts request for user:', userId);
+        console.log('📄 Request headers:', req.headers);
+        
+        // Log authorization header if present
+        const authHeader = req.headers.authorization;
+        console.log('🔑 Auth header present:', !!authHeader);
+        if (authHeader) {
+          console.log('🔑 Auth header length:', authHeader.length);
+          console.log('🔑 Auth header type:', authHeader.startsWith('Bearer ') ? 'Bearer token' : 'Other format');
+        }
+      }
+      
+      try {
+        // Try direct database approach first when on Vercel for more reliability
+        if (process.env.VERCEL === '1') {
+          console.log('📊 Using direct database query for workouts in Vercel environment');
+          const { getPool } = await import('./db.js');
+          const pool = await getPool();
+          
+          if (pool) {
+            const result = await pool.query(
+              'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
+              [userId]
+            );
+            console.log(`✅ Retrieved ${result.rows.length} workouts directly from database`);
+            return res.json(result.rows);
+          } else {
+            console.log('⚠️ Pool not available, falling back to storage interface');
+          }
+        }
+        
+        // Standard approach through storage interface
+        const workouts = await storage.getWorkouts(userId);
+        console.log(`✅ Retrieved ${workouts.length} workouts via storage interface`);
+        res.json(workouts);
+      } catch (dbError) {
+        console.error('❌ Database error fetching workouts:', dbError);
+        
+        // Try fallback approach if initial attempt failed
+        try {
+          console.log('🔄 Trying alternative workout fetch method');
+          
+          // Direct SQL query as last resort
+          const { getPool } = await import('./db.js');
+          const pool = await getPool();
+          
+          if (pool) {
+            const result = await pool.query(
+              'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
+              [userId]
+            );
+            console.log(`✅ Retrieved ${result.rows.length} workouts with fallback method`);
+            return res.json(result.rows);
+          } else {
+            throw new Error('Database pool not available for fallback query');
+          }
+        } catch (fallbackError) {
+          console.error('❌ All workout fetch methods failed:', fallbackError);
+          throw dbError; // Throw original error for consistent error messages
+        }
+      }
     } catch (error) {
       console.error('Workout fetch error:', error);
-      res.status(500).json({ message: "Failed to fetch workouts", error: error instanceof Error ? error.message : String(error) }); 
+      res.status(500).json({ 
+        message: "Failed to fetch workouts", 
+        error: error instanceof Error ? error.message : String(error),
+        environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+        nodeEnv: process.env.NODE_ENV || 'development'
+      }); 
     }
   });
 
