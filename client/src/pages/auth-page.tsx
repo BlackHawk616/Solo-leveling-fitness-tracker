@@ -11,17 +11,26 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   if (user) {
+    console.log("User already authenticated, redirecting to home");
     return <Redirect to="/" />;
   }
 
   const handleGoogleLogin = async () => {
     try {
+      console.log("Starting Google login process");
       const result = await googleLoginMutation.mutateAsync();
       console.log("Login successful:", result);
-      // Use a slight delay to ensure state is updated before redirect
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 500);
+      
+      // Make sure we have user data before redirect
+      if (result && (result.userData || result.firebaseUser)) {
+        console.log("Login data verified, redirecting to home");
+        // Use a longer delay to ensure state is fully updated
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      } else {
+        console.warn("Login succeeded but no user data returned");
+      }
     } catch (error) {
       console.error("Login failed:", error);
     }

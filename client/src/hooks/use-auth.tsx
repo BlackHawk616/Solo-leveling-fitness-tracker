@@ -36,45 +36,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) return null;
 
-    try {
-      console.log('Fetching user data for:', firebaseUser.uid);
-      const token = await firebaseUser.getIdToken(true); // Force refresh token
-      
-      console.log('Got token, making API request to /api/users');
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          id: firebaseUser.uid,
-          email: firebaseUser.email,
-          username: firebaseUser.displayName || 'User',
-          photoURL: firebaseUser.photoURL
-        })
-      });
+    // Retry mechanism for token issues
+    const maxRetries = 2;
+    let retryCount = 0;
+    let lastError: any = null;
 
-      console.log('API response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to fetch user data:', errorText);
-        throw new Error(`Failed to fetch user data: ${response.status} - ${errorText}`);
-      }
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`Fetching user data attempt ${retryCount + 1}/${maxRetries + 1} for:`, firebaseUser.uid);
+        
+        // Force token refresh on retries
+        const token = await firebaseUser.getIdToken(retryCount > 0);
+        
+        console.log('Got token, making API request to /api/users');
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-Firebase-Token': token, // Add token in a custom header for debugging
+          },
+          body: JSON.stringify({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || 'unknown@example.com', // Fallback email
+            username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            photoURL: firebaseUser.photoURL
+          })
+        });
 
-      const data = await response.json();
-      console.log('User data retrieved successfully');
-      return data;
-    } catch (err) {
-      console.error('Error fetching user data:', err);
-      // Additional detailed logging
-      if (err instanceof Error) {
-        console.error('Error details:', err.message);
-        if (err.stack) console.error('Stack trace:', err.stack);
+        console.log('API response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to fetch user data (attempt ${retryCount + 1}):`, errorText);
+          
+          // Only retry on certain status codes
+          if (response.status === 401 || response.status === 403) {
+            lastError = new Error(`Auth error: ${response.status} - ${errorText}`);
+            retryCount++;
+            continue;
+          }
+          
+          throw new Error(`Failed to fetch user data: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('User data retrieved successfully');
+        return data;
+      } catch (err) {
+        console.error(`Error fetching user data (attempt ${retryCount + 1}):`, err);
+        lastError = err;
+        
+        // Additional detailed logging
+        if (err instanceof Error) {
+          console.error('Error details:', err.message);
+          if (err.stack) console.error('Stack trace:', err.stack);
+        }
+        
+        retryCount++;
+        
+        if (retryCount <= maxRetries) {
+          console.log(`Retrying in 1 second... (${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-      throw err;
     }
+    
+    // If we've exhausted all retries, throw the last error
+    console.error('All fetch user data attempts failed');
+    throw lastError;
   };
 
   // Update user profile function

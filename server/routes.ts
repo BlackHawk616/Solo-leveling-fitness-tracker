@@ -9,7 +9,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Debug environment request received');
     res.json({
       env: process.env.NODE_ENV,
-      headers: req.headers
+      headers: req.headers,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Token debug endpoint
+  app.get('/api/debug-token', (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    console.log('Token debug request received');
+    
+    // Only show token format, not the actual token for security
+    const tokenFormat = authHeader.startsWith('Bearer ') 
+      ? 'Valid Bearer format' 
+      : 'Invalid format or missing token';
+    
+    const tokenLength = authHeader.replace('Bearer ', '').length;
+    
+    res.json({
+      hasToken: !!authHeader,
+      tokenFormat,
+      tokenLength,
+      timestamp: new Date().toISOString()
     });
   });
 
@@ -48,34 +69,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('Received user data request', req.body);
       const { id, email, username, photoURL } = req.body;
+      
+      // Log authorization header if present
+      const authHeader = req.headers.authorization;
+      console.log('Auth header present:', !!authHeader);
 
       if (!id || !email) {
         console.log('Missing required user data', { id, email });
         return res.status(400).json({ message: 'Missing required user data' });
       }
 
-      // Authentication verification removed due to incomplete changes
-
+      // Check for database connectivity before proceeding
       try {
+        const { pool } = await import('./db.js');
+        await pool.query('SELECT 1');
+        console.log('Database connection verified before user operation');
+      } catch (dbError) {
+        console.error('Database connection failed:', dbError);
+        return res.status(503).json({ 
+          message: "Database connection error", 
+          error: dbError instanceof Error ? dbError.message : String(dbError) 
+        });
+      }
+
+      // Now proceed with user lookup/creation
+      try {
+        console.log('Looking up user with Firebase ID:', id);
         const existingUser = await storage.getUserByFirebaseId(id);
-        console.log('Existing user found:', existingUser);
+        console.log('Existing user lookup result:', existingUser ? 'Found' : 'Not found');
 
         if (existingUser) {
+          console.log('Returning existing user data');
           return res.json(existingUser);
         } else {
+          console.log('Creating new user with ID:', id);
           try {
             const user = await storage.createUser(id, {
               email,
-              username,
+              username: username || email.split('@')[0],
               photoURL 
             });
-            console.log('Created new user:', user);
+            console.log('Created new user successfully:', user);
             return res.status(201).json(user);
           } catch (createError) {
             console.error('Error creating new user:', createError);
             return res.status(500).json({ 
               message: "Failed to create user", 
-              error: createError instanceof Error ? createError.message : String(createError) 
+              error: createError instanceof Error ? createError.message : String(createError),
+              stack: createError instanceof Error ? createError.stack : undefined
             });
           }
         }
@@ -83,14 +124,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error looking up existing user:', lookupError);
         return res.status(500).json({ 
           message: "Failed to lookup user", 
-          error: lookupError instanceof Error ? lookupError.message : String(lookupError) 
+          error: lookupError instanceof Error ? lookupError.message : String(lookupError),
+          stack: lookupError instanceof Error ? lookupError.stack : undefined
         });
       }
     } catch (error) {
       console.error('User creation error:', error);
       return res.status(500).json({ 
         message: "Failed to process user request", 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       });
     }
   });
