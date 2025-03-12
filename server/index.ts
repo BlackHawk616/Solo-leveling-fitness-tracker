@@ -78,9 +78,23 @@ import { checkDatabaseConnection } from './db.js';
 
   // Test database connection before starting server
   try {
-    const isConnected = await checkDatabaseConnection();
+    // Try connection check multiple times in Vercel environment
+    const isVercel = process.env.VERCEL === '1';
+    const maxAttempts = isVercel ? 3 : 1;
+    let isConnected = false;
+    
+    for (let i = 0; i < maxAttempts && !isConnected; i++) {
+      console.log(`🔌 Database connection check attempt ${i+1}/${maxAttempts}...`);
+      isConnected = await checkDatabaseConnection(i+1);
+      
+      if (!isConnected && i < maxAttempts - 1) {
+        console.log('⏳ Waiting before next connection attempt...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
     if (!isConnected) {
-      console.error('❌ Database connection check failed');
+      console.error('❌ Database connection check failed after multiple attempts');
       console.error('⚠️ Starting server anyway, but database operations may fail');
     } else {
       console.log('✅ Database connection check passed');
