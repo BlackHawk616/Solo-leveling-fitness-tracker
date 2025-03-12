@@ -18,14 +18,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/debug-token', (req, res) => {
     const authHeader = req.headers.authorization || '';
     console.log('Token debug request received');
-    
+
     // Only show token format, not the actual token for security
     const tokenFormat = authHeader.startsWith('Bearer ') 
       ? 'Valid Bearer format' 
       : 'Invalid format or missing token';
-    
+
     const tokenLength = authHeader.replace('Bearer ', '').length;
-    
+
     res.json({
       hasToken: !!authHeader,
       tokenFormat,
@@ -45,8 +45,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let dbError = null;
 
     try {
-      // Import pool from db.ts
-      const { pool } = await import('./db.js');
+      // Import getPool from db.ts
+      const { getPool } = await import('./db.js');
+      const pool = await getPool();
       const client = await pool.connect();
       await client.query('SELECT 1');
       client.release();
@@ -69,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('🔍 Received user data request', req.body);
       const { id, email, username, photoURL } = req.body;
-      
+
       // Log request details for debugging
       console.log('📄 Full request details:', {
         body: req.body,
@@ -78,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url: req.url,
         ip: req.ip
       });
-      
+
       // Log authorization header if present
       const authHeader = req.headers.authorization;
       console.log('🔑 Auth header present:', !!authHeader);
@@ -95,20 +96,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enhanced error handling for database operations
       let dbConnectionOk = false;
       let dbPool = null;
-      
+
       // Try connecting to database with several attempts
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           console.log(`🔌 Checking database connection (attempt ${attempt})...`);
-          const { pool } = await import('./db.js');
-          dbPool = pool;
-          await pool.query('SELECT 1');
+          const { getPool } = await import('./db.js');
+          dbPool = await getPool();
+          await dbPool.query('SELECT 1');
           console.log('✅ Database connection verified before user operation');
           dbConnectionOk = true;
           break;
         } catch (dbError) {
           console.error(`❌ Database connection failed (attempt ${attempt}):`, dbError);
-          
+
           if (attempt === 3) {
             console.error('🔍 DATABASE_URL present:', !!process.env.DATABASE_URL);
             if (process.env.DATABASE_URL) {
@@ -122,12 +123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               error: dbError instanceof Error ? dbError.message : String(dbError) 
             });
           }
-          
+
           // Wait before next attempt
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
       }
-      
+
       if (!dbConnectionOk) {
         return res.status(503).json({ message: "Failed to establish database connection" });
       }
@@ -135,21 +136,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Now proceed with user lookup/creation with transaction for data consistency
       try {
         console.log('🔍 Looking up or creating user with Firebase ID:', id);
-        
+
         // Try using a transaction for better reliability
         const client = await dbPool.connect();
-        
+
         try {
           await client.query('BEGIN');
-          
+
           // First check if user exists
           const existingUserResult = await client.query(
             'SELECT * FROM "users" WHERE "id" = $1', 
             [id]
           );
-          
+
           const existingUser = existingUserResult.rows[0];
-          
+
           if (existingUser) {
             console.log('✅ Found existing user in transaction');
             await client.query('COMMIT');
@@ -161,10 +162,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'INSERT INTO "users" ("id", "email", "username", "level", "exp", "totalWorkoutSeconds") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
               [id, email, username || email.split('@')[0], 1, 0, 0]
             );
-            
+
             const newUser = userInsertResult.rows[0];
             console.log('✅ Created new user via transaction:', newUser);
-            
+
             await client.query('COMMIT');
             return res.status(201).json(newUser);
           }
@@ -177,17 +178,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (userOpError) {
         console.error('❌ Error in user lookup/creation:', userOpError);
-        
+
         // Last resort fallback - try the original storage method
         try {
           console.log('🔄 Trying fallback method for user lookup/creation');
-          
+
           // Debug storage object
           console.log('🔧 Storage methods available:', Object.keys(storage));
-          
+
           const existingUser = await storage.getUserByFirebaseId(id);
           console.log('🔍 Existing user lookup result:', existingUser ? 'Found' : 'Not found');
-          
+
           if (existingUser) {
             console.log('✅ Returning existing user data from fallback');
             return res.json(existingUser);
@@ -198,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               username: username || email.split('@')[0],
               photoURL 
             };
-            
+
             const user = await storage.createUser(id, userToCreate);
             console.log('✅ Created new user successfully with fallback:', JSON.stringify(user));
             return res.status(201).json(user);

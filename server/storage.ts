@@ -1,7 +1,7 @@
 import { User, Workout, InsertUser, InsertWorkout, users, workouts } from "../shared/schema.js";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { db } from "./db.js";
+import { getDb } from "./db.js";
 import { eq, and, gte, lte } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
@@ -36,6 +36,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: string): Promise<User | undefined> {
     try {
+      const db = await getDb();
       const [user] = await db.select().from(users).where(eq(users.id, id));
       return user;
     } catch (error) {
@@ -56,6 +57,7 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(firebaseId: string, insertUser: InsertUser): Promise<User> {
     try {
+      const db = await getDb();
       const [existingUser] = await db
         .select()
         .from(users)
@@ -84,6 +86,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUsername(userId: string, username: string): Promise<User> {
     try {
+      const db = await getDb();
       const [user] = await db
         .update(users)
         .set({ username })
@@ -100,6 +103,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserExp(userId: string, expGained: number): Promise<User> {
     try {
+      const db = await getDb();
       const [user] = await db
         .select()
         .from(users)
@@ -132,6 +136,7 @@ export class DatabaseStorage implements IStorage {
 
   async createWorkout(userId: string, workout: InsertWorkout): Promise<Workout> {
     try {
+      const db = await getDb();
       const [newWorkout] = await db
         .insert(workouts)
         .values({
@@ -164,6 +169,7 @@ export class DatabaseStorage implements IStorage {
 
   async getWorkouts(userId: string): Promise<Workout[]> {
     try {
+      const db = await getDb();
       return db
         .select()
         .from(workouts)
@@ -177,6 +183,7 @@ export class DatabaseStorage implements IStorage {
 
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {
     try {
+      const db = await getDb();
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
 
@@ -207,6 +214,7 @@ export class DatabaseStorage implements IStorage {
     elapsedSeconds: number;
   } | null): Promise<User> {
     try {
+      const db = await getDb();
       const [user] = await db
         .update(users)
         .set({ currentWorkout: workout })

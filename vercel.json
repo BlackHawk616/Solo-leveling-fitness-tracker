@@ -30,7 +30,12 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server/index.js"
+      "dest": "server/index.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Firebase-Token, X-Client-Version, X-Request-ID"
+      }
     },
     {
       "src": "/assets/(.*)",
@@ -40,5 +45,8 @@
       "src": "/((?!api/.*).*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
