@@ -164,8 +164,8 @@ export class DatabaseStorage implements IStorage {
       const user = users[0] as User;
 
       // Ensure totalWorkoutSeconds is a valid number before adding
-      const currentTotal = typeof user.totalWorkoutSeconds === 'number' && !isNaN(user.totalWorkoutSeconds) 
-        ? user.totalWorkoutSeconds 
+      const currentTotal = typeof user.total_workout_seconds === 'number' && !isNaN(user.total_workout_seconds) 
+        ? user.total_workout_seconds 
         : 0;
       
       const durationToAdd = typeof workout.durationSeconds === 'number' && !isNaN(workout.durationSeconds)

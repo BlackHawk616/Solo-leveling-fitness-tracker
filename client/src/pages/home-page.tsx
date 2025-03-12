@@ -509,7 +509,8 @@ export default function HomePage() {
                   <div className={`text-center p-4 rounded-lg ${rankStyle.bg}`}>
                     <Timer className={`h-5 w-5 mx-auto mb-2 ${rankStyle.color}`} />
                     <div className="font-medium">
-                      {formatDuration(user?.totalWorkoutSeconds || user?.total_workout_seconds || 0)}
+                      {formatDuration(user?.totalWorkoutSeconds || user?.total_workout_seconds || 
+                        workouts.reduce((total, workout) => total + (workout.durationSeconds || workout.duration_seconds || 0), 0) || 0)}
                     </div>
                   </div>
                 </div>
