@@ -509,7 +509,7 @@ export default function HomePage() {
                   <div className={`text-center p-4 rounded-lg ${rankStyle.bg}`}>
                     <Timer className={`h-5 w-5 mx-auto mb-2 ${rankStyle.color}`} />
                     <div className="font-medium">
-                      {formatDuration(user?.totalWorkoutSeconds ?? 0)}
+                      {formatDuration(user?.totalWorkoutSeconds || user?.total_workout_seconds || 0)}
                     </div>
                   </div>
                 </div>
@@ -571,22 +571,29 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {workouts.slice(0, 15).map((workout: Workout) => (
-                <div
-                  key={workout.id}
-                  className="flex items-center justify-between p-4 bg-primary/5 rounded-lg"
-                >
-                  <div>
-                    <div className="font-medium">{workout.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatDate(workout.startedAt)}
+              {workouts.slice(0, 15).map((workout: Workout) => {
+                // Ensure startedAt is a proper Date object
+                const startedAt = workout.startedAt instanceof Date 
+                  ? workout.startedAt 
+                  : new Date(workout.startedAt || workout.started_at);
+                
+                return (
+                  <div
+                    key={workout.id}
+                    className="flex items-center justify-between p-4 bg-primary/5 rounded-lg"
+                  >
+                    <div>
+                      <div className="font-medium">{workout.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDate(startedAt)}
+                      </div>
+                    </div>
+                    <div className="font-mono text-primary">
+                      {formatDuration(workout.durationSeconds || workout.duration_seconds)}
                     </div>
                   </div>
-                  <div className="font-mono text-primary">
-                    {formatDuration(workout.durationSeconds)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {workouts.length > 15 && (
                 <div className="text-center text-sm text-muted-foreground pt-2">
                   Showing 15 most recent workouts of {workouts.length} total

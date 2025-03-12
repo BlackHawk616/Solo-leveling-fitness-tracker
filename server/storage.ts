@@ -212,7 +212,16 @@ export class DatabaseStorage implements IStorage {
         'SELECT * FROM workouts WHERE user_id = ? ORDER BY started_at DESC',
         [userId]
       );
-      return workouts as Workout[];
+      
+      // Properly convert MySQL workout data to the expected Workout format
+      return (workouts as any[]).map(workout => ({
+        id: workout.id,
+        userId: workout.user_id,
+        name: workout.name,
+        durationSeconds: workout.duration_seconds,
+        startedAt: new Date(workout.started_at),
+        endedAt: new Date(workout.ended_at)
+      }));
     } catch (error) {
       console.error('Error in getWorkouts:', error);
       throw error;
