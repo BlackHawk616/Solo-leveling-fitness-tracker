@@ -7,29 +7,34 @@ export function registerDebugRoutes(app: Express) {
     try {
       const { getPool } = await import('./db.js');
       const pool = await getPool();
-      let client;
 
       try {
         console.log('Attempting to connect to database...');
-        client = await pool.connect();
-        const [result] = await client.query('SELECT 1 as test');
-
-        res.json({
-          success: true,
-          environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
-          message: 'Database connection successful',
-          result: result
-        });
+        const connection = await pool.getConnection();
+        try {
+          const [result] = await connection.query('SELECT 1 as test');
+          console.log('Debug database query result:', result);
+          
+          res.json({
+            success: true,
+            environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+            message: 'Database connection successful',
+            result: result,
+            vercel_region: process.env.VERCEL_REGION || 'N/A',
+            node_version: process.version
+          });
+        } finally {
+          connection.release();
+        }
       } catch (err) {
         console.error('Database query error:', err);
         res.status(500).json({
           success: false,
           environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
           error: err instanceof Error ? err.message : String(err),
-          message: 'Database connection test failed'
+          message: 'Database connection test failed',
+          vercel_region: process.env.VERCEL_REGION || 'N/A'
         });
-      } finally {
-        if (client) client.release();
       }
     } catch (err) {
       console.error('Failed to import or initialize database:', err);
@@ -129,6 +134,34 @@ export function registerDebugRoutes(app: Express) {
       border: 1px solid #333;
     }
     .profile-header {
+
+  // Endpoint to check Vercel deployment info
+  app.get('/api/debug/vercel-info', (req, res) => {
+    const envVars = {
+      VERCEL: process.env.VERCEL || 'Not set',
+      VERCEL_REGION: process.env.VERCEL_REGION || 'Not set',
+      VERCEL_ENV: process.env.VERCEL_ENV || 'Not set',
+      NODE_ENV: process.env.NODE_ENV || 'Not set',
+      DATABASE_URL_PREFIX: process.env.DATABASE_URL ? 
+        process.env.DATABASE_URL.substring(0, 15) + '...' : 'Not configured'
+    };
+    
+    const systemInfo = {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime()
+    };
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      environment: envVars,
+      system: systemInfo,
+      headers: req.headers
+    });
+  });
+
       display: flex;
       align-items: center;
       gap: 12px;
