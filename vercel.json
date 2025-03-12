@@ -15,7 +15,7 @@
           "tsconfig.json",
           "tsconfig.vercel.json"
         ],
-        "nodeVersion": "20.x"
+        "nodeVersion": "18.x"
       }
     },
     {
