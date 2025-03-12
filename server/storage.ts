@@ -145,9 +145,14 @@ export class DatabaseStorage implements IStorage {
   async createWorkout(userId: string, workout: InsertWorkout): Promise<Workout> {
     try {
       const pool = await getPool();
+
+      // Format dates to MySQL timestamp format
+      const startedAtFormatted = workout.startedAt.toISOString().slice(0, 19).replace('T', ' ');
+      const endedAtFormatted = workout.endedAt.toISOString().slice(0, 19).replace('T', ' ');
+
       await pool.query(
         'INSERT INTO workouts (user_id, name, duration_seconds, started_at, ended_at) VALUES (?, ?, ?, ?, ?)',
-        [userId, workout.name, workout.durationSeconds, workout.startedAt, workout.endedAt]
+        [userId, workout.name, workout.durationSeconds, startedAtFormatted, endedAtFormatted]
       );
 
       const [users] = await pool.query(
@@ -168,7 +173,14 @@ export class DatabaseStorage implements IStorage {
         [userId]
       );
 
-      return workouts[0] as Workout;
+      // Convert the MySQL datetime back to JavaScript Date objects
+      const workout_result = {
+        ...workouts[0],
+        startedAt: new Date(workouts[0].started_at),
+        endedAt: new Date(workouts[0].ended_at)
+      } as Workout;
+
+      return workout_result;
     } catch (error) {
       console.error('Error in createWorkout:', error);
       throw error;
@@ -194,13 +206,15 @@ export class DatabaseStorage implements IStorage {
       const pool = await getPool();
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
+      const startFormatted = startOfDay.toISOString().slice(0, 19).replace('T', ' ');
 
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
+      const endFormatted = endOfDay.toISOString().slice(0, 19).replace('T', ' ');
 
       const [workouts] = await pool.query(
         'SELECT SUM(duration_seconds) as total FROM workouts WHERE user_id = ? AND started_at BETWEEN ? AND ?',
-        [userId, startOfDay, endOfDay]
+        [userId, startFormatted, endFormatted]
       );
 
       return workouts[0]?.total || 0;
