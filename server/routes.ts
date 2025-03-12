@@ -4,16 +4,25 @@ import { storage } from "./storage.js";
 import { insertWorkoutSchema } from "../shared/schema.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Debug endpoint to check environment
+  app.get('/api/debug-env', (req, res) => {
+    console.log('Debug environment request received');
+    res.json({
+      env: process.env.NODE_ENV,
+      headers: req.headers
+    });
+  });
+
   // Temporary debug endpoint - REMOVE AFTER DEPLOYMENT DEBUG
-  app.get("/api/debug-env", async (req, res) => {
+  app.get("/api/debug-env-db", async (req, res) => {
     const hasDbUrl = !!process.env.DATABASE_URL;
     const dbUrlLength = process.env.DATABASE_URL?.length || 0;
     const hasSslMode = process.env.DATABASE_URL?.includes('sslmode=require');
-    
+
     // Test database connection
     let dbConnection = false;
     let dbError = null;
-    
+
     try {
       // Import pool from db.ts
       const { pool } = await import('./db.js');
@@ -37,16 +46,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", async (req, res) => {
     try {
-      console.log('POST /api/users - Request body:', req.body);
-      const { id, email, username } = req.body;
+      console.log('Received user data request', req.body);
+      const { id, email, username, photoURL } = req.body;
 
-      if (!id) {
-        console.error('Missing required field: id');
-        return res.status(400).json({ message: "Missing required field: id" });
+      if (!id || !email) {
+        console.log('Missing required user data', { id, email });
+        return res.status(400).json({ message: 'Missing required user data' });
       }
 
-      // Debug log for incoming data
-      console.log('Attempting to create/fetch user with:', { id, email, username });
+      // Authentication verification removed due to incomplete changes
 
       try {
         const existingUser = await storage.getUserByFirebaseId(id);
@@ -58,7 +66,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const user = await storage.createUser(id, {
               email,
-              username
+              username,
+              photoURL 
             });
             console.log('Created new user:', user);
             return res.status(201).json(user);
@@ -95,7 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       console.error('Username update error:', error);
-      res.status(500).json({ message: "Failed to update username" });
+      res.status(500).json({ message: "Failed to update username", error: error instanceof Error ? error.message : String(error) }); 
     }
   });
 
@@ -137,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({ workout: newWorkout, user: updatedUser });
     } catch (error) {
       console.error('Workout creation error:', error);
-      res.status(500).json({ message: "Failed to create workout" });
+      res.status(500).json({ message: "Failed to create workout", error: error instanceof Error ? error.message : String(error) }); 
     }
   });
 
@@ -148,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(workouts);
     } catch (error) {
       console.error('Workout fetch error:', error);
-      res.status(500).json({ message: "Failed to fetch workouts" });
+      res.status(500).json({ message: "Failed to fetch workouts", error: error instanceof Error ? error.message : String(error) }); 
     }
   });
 
@@ -161,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       console.error('Current workout update error:', error);
-      res.status(500).json({ message: "Failed to update current workout" });
+      res.status(500).json({ message: "Failed to update current workout", error: error instanceof Error ? error.message : String(error) }); 
     }
   });
 
