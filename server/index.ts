@@ -47,14 +47,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Placeholder database connection check function
-async function checkDatabaseConnection() {
-  console.log('Checking database connection...');
-  // Replace this with your actual database connection logic
-  // This is a placeholder and will always return true for demonstration purposes.
-  // In a real application, you should connect to your TiDB Cloud instance and verify connectivity.
-  return true; 
-}
+// Import the actual database connection check from db.ts
+import { checkDatabaseConnection } from './db.js';
 
 (async () => {
   console.log('Starting server...');

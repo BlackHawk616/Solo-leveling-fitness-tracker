@@ -1,13 +1,17 @@
 import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
 import * as schema from "../shared/schema.js";
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Better logging of environment
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
 
 // Load database URL from environment or use the hardcoded value
-const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
+const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:U9vZRO8g03jvRKrA@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
 console.log("Using DATABASE_URL:", DATABASE_URL.substring(0, 15) + "...");
 
 if (!DATABASE_URL) {
