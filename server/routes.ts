@@ -188,20 +188,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const workout = insertWorkoutSchema.parse(req.body);
 
-        // Ensure dates are valid
-        if (isNaN(workout.startedAt.getTime()) || isNaN(workout.endedAt.getTime())) {
-          return res.status(400).json({
-            message: "Invalid workout dates provided"
-          });
-        }
-
-        // Minimum workout duration: 30 seconds
-        if (workout.durationSeconds < 30) {
-          return res.status(400).json({ 
-            message: "Workout must be at least 30 seconds long" 
-          });
-        }
-
         // Check daily limit (6 hours = 21600 seconds)
         const today = new Date();
         today.setHours(0, 0, 0, 0);

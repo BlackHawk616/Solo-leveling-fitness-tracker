@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = mysqlTable("users", {
-  id: varchar("id", { length: 128 }).primaryKey(), // Changed to varchar for Firebase ID
+  id: varchar("id", { length: 128 }).primaryKey(),
   email: varchar("email", { length: 255 }).notNull(),
   username: varchar("username", { length: 255 }).notNull(),
   level: int("level").notNull().default(1),
@@ -38,16 +38,24 @@ export const insertWorkoutSchema = createInsertSchema(workouts)
     durationSeconds: z.number().min(30, "Workout must be at least 30 seconds"),
     startedAt: z.union([
       z.date(),
-      z.string().transform((str) => new Date(str))
-    ]).refine((date) => !isNaN(date.getTime()), {
-      message: "Invalid date format"
-    }),
+      z.string().transform((str) => {
+        const date = new Date(str);
+        if (isNaN(date.getTime())) {
+          throw new Error("Invalid startedAt date");
+        }
+        return date;
+      })
+    ]),
     endedAt: z.union([
       z.date(),
-      z.string().transform((str) => new Date(str))
-    ]).refine((date) => !isNaN(date.getTime()), {
-      message: "Invalid date format"
-    })
+      z.string().transform((str) => {
+        const date = new Date(str);
+        if (isNaN(date.getTime())) {
+          throw new Error("Invalid endedAt date");
+        }
+        return date;
+      })
+    ])
   });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
