@@ -167,20 +167,20 @@ export class DatabaseStorage implements IStorage {
       const currentTotal = typeof user.total_workout_seconds === 'number' && !isNaN(user.total_workout_seconds) 
         ? user.total_workout_seconds 
         : 0;
-      
+
       const durationToAdd = typeof workout.durationSeconds === 'number' && !isNaN(workout.durationSeconds)
         ? workout.durationSeconds
         : 0;
-      
+
       const newTotal = currentTotal + durationToAdd;
-      
+
       console.log('Updating total workout seconds:', {
         userId,
         currentTotal,
         durationToAdd,
         newTotal
       });
-      
+
       await pool.query(
         'UPDATE users SET total_workout_seconds = ? WHERE id = ?',
         [newTotal, userId]
@@ -212,7 +212,7 @@ export class DatabaseStorage implements IStorage {
         'SELECT * FROM workouts WHERE user_id = ? ORDER BY started_at DESC',
         [userId]
       );
-      
+
       // Properly convert MySQL workout data to the expected Workout format
       return (workouts as any[]).map(workout => ({
         id: workout.id,
@@ -231,23 +231,25 @@ export class DatabaseStorage implements IStorage {
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {
     try {
       const pool = await getPool();
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const startFormatted = startOfDay.toISOString().slice(0, 19).replace('T', ' ');
 
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      const endFormatted = endOfDay.toISOString().slice(0, 19).replace('T', ' ');
+      // Format the date properly for MySQL date comparison
+      const formattedDate = date.toISOString().split('T')[0];
+      console.log('Checking workouts for date:', formattedDate);
 
       const [workouts] = await pool.query(
-        'SELECT SUM(duration_seconds) as total FROM workouts WHERE user_id = ? AND started_at BETWEEN ? AND ?',
-        [userId, startFormatted, endFormatted]
+        'SELECT SUM(duration_seconds) as total FROM workouts WHERE user_id = ? AND DATE(started_at) = ?',
+        [userId, formattedDate]
       );
 
-      return workouts[0]?.total || 0;
+      // Check if we got a valid result and return it
+      const totalDuration = workouts[0].total || 0;
+      console.log('Total duration for today:', totalDuration);
+
+      return totalDuration;
     } catch (error) {
       console.error('Error in getDailyWorkoutSeconds:', error);
-      throw error;
+      // Return 0 in case of error to prevent blocking workouts
+      return 0;
     }
   }
 

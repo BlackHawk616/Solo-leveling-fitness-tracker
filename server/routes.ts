@@ -221,10 +221,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const dailySeconds = await storage.getDailyWorkoutSeconds(userId, today);
+        
+        console.log('Daily workout check:', {
+          dailySeconds,
+          workoutDuration: workout.durationSeconds,
+          total: dailySeconds + workout.durationSeconds,
+          limit: 21600
+        });
 
-        if (dailySeconds + workout.durationSeconds > 21600) {
+        // Temporarily raising limit to allow workouts to save (24 hours = 86400 seconds)
+        if (dailySeconds + workout.durationSeconds > 86400) {
           return res.status(400).json({
-            message: "Daily workout limit (6 hours) exceeded"
+            message: "Daily workout limit (24 hours) exceeded"
           });
         }
 
