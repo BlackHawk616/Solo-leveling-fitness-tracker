@@ -67,11 +67,26 @@ import { checkDatabaseConnection } from './db.js';
 
   // Create a special header for Vercel deployments
   if (process.env.VERCEL === '1') {
+    console.log('🚀 Setting up Vercel-specific middleware');
+    console.log('🌍 Vercel Region:', process.env.VERCEL_REGION || 'unknown');
+    
     app.use((req, res, next) => {
       // Add custom headers to help debug requests on Vercel
       req.headers['x-deployment-env'] = 'vercel';
+      req.headers['x-vercel-region'] = process.env.VERCEL_REGION || 'unknown';
       // Track request start time for performance monitoring
       req.headers['x-request-start'] = Date.now().toString();
+      
+      // Add better error handling for Vercel environment
+      const originalSend = res.send;
+      res.send = function(body) {
+        if (res.statusCode >= 400) {
+          console.error(`⚠️ Error response [${res.statusCode}]:`, 
+                       typeof body === 'string' ? body : JSON.stringify(body).substring(0, 200));
+        }
+        return originalSend.call(this, body);
+      };
+      
       next();
     });
   }
