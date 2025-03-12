@@ -67,25 +67,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", async (req, res) => {
     try {
-      console.log('Received user data request', req.body);
+      console.log('🔍 Received user data request', req.body);
       const { id, email, username, photoURL } = req.body;
+      
+      // Log request details for debugging
+      console.log('📄 Full request details:', {
+        body: req.body,
+        headers: req.headers,
+        method: req.method,
+        url: req.url,
+        ip: req.ip
+      });
       
       // Log authorization header if present
       const authHeader = req.headers.authorization;
-      console.log('Auth header present:', !!authHeader);
+      console.log('🔑 Auth header present:', !!authHeader);
+      if (authHeader) {
+        console.log('🔑 Auth header length:', authHeader.length);
+        console.log('🔑 Auth header type:', authHeader.startsWith('Bearer ') ? 'Bearer token' : 'Other format');
+      }
 
       if (!id || !email) {
-        console.log('Missing required user data', { id, email });
+        console.log('⚠️ Missing required user data', { id, email });
         return res.status(400).json({ message: 'Missing required user data' });
       }
 
       // Check for database connectivity before proceeding
       try {
+        console.log('🔌 Checking database connection...');
         const { pool } = await import('./db.js');
         await pool.query('SELECT 1');
-        console.log('Database connection verified before user operation');
+        console.log('✅ Database connection verified before user operation');
       } catch (dbError) {
-        console.error('Database connection failed:', dbError);
+        console.error('❌ Database connection failed:', dbError);
+        console.error('🔍 DATABASE_URL present:', !!process.env.DATABASE_URL);
+        if (process.env.DATABASE_URL) {
+          console.error('🔍 DATABASE_URL length:', process.env.DATABASE_URL.length);
+          console.error('🔍 DATABASE_URL format check:', 
+            process.env.DATABASE_URL.startsWith('postgres://') || 
+            process.env.DATABASE_URL.startsWith('postgresql://') ? 'Valid format' : 'Invalid format');
+        }
         return res.status(503).json({ 
           message: "Database connection error", 
           error: dbError instanceof Error ? dbError.message : String(dbError) 
@@ -94,25 +115,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Now proceed with user lookup/creation
       try {
-        console.log('Looking up user with Firebase ID:', id);
+        console.log('🔍 Looking up user with Firebase ID:', id);
+        
+        // Debug storage object
+        console.log('🔧 Storage methods available:', Object.keys(storage));
+        
         const existingUser = await storage.getUserByFirebaseId(id);
-        console.log('Existing user lookup result:', existingUser ? 'Found' : 'Not found');
+        console.log('🔍 Existing user lookup result:', existingUser ? 'Found' : 'Not found');
+        if (existingUser) {
+          console.log('📝 Existing user data:', JSON.stringify(existingUser));
+        }
 
         if (existingUser) {
-          console.log('Returning existing user data');
+          console.log('✅ Returning existing user data');
           return res.json(existingUser);
         } else {
-          console.log('Creating new user with ID:', id);
+          console.log('🆕 Creating new user with ID:', id);
           try {
-            const user = await storage.createUser(id, {
+            const userToCreate = {
               email,
               username: username || email.split('@')[0],
               photoURL 
-            });
-            console.log('Created new user successfully:', user);
+            };
+            console.log('📝 User data to create:', userToCreate);
+            
+            const user = await storage.createUser(id, userToCreate);
+            console.log('✅ Created new user successfully:', JSON.stringify(user));
             return res.status(201).json(user);
           } catch (createError) {
-            console.error('Error creating new user:', createError);
+            console.error('❌ Error creating new user:', createError);
             return res.status(500).json({ 
               message: "Failed to create user", 
               error: createError instanceof Error ? createError.message : String(createError),
@@ -121,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } catch (lookupError) {
-        console.error('Error looking up existing user:', lookupError);
+        console.error('❌ Error looking up existing user:', lookupError);
         return res.status(500).json({ 
           message: "Failed to lookup user", 
           error: lookupError instanceof Error ? lookupError.message : String(lookupError),

@@ -37,73 +37,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) return null;
 
     // Retry mechanism for token issues
-    const maxRetries = 2;
+    const maxRetries = 3;
     let retryCount = 0;
     let lastError: any = null;
 
     while (retryCount <= maxRetries) {
       try {
-        console.log(`Fetching user data attempt ${retryCount + 1}/${maxRetries + 1} for:`, firebaseUser.uid);
+        console.log(`[Auth] Fetching user data attempt ${retryCount + 1}/${maxRetries + 1} for:`, firebaseUser.uid);
         
         // Force token refresh on retries
         const token = await firebaseUser.getIdToken(retryCount > 0);
+        console.log(`[Auth] Got token (${token.substring(0, 10)}...), length: ${token.length}`);
         
-        console.log('Got token, making API request to /api/users');
+        // Prepare request data
+        const userData = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || 'unknown@example.com', // Fallback email
+          username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+          photoURL: firebaseUser.photoURL
+        };
+        console.log('[Auth] User data to send:', userData);
+        
+        console.log('[Auth] Making API request to /api/users');
         const response = await fetch('/api/users', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
-            'X-Firebase-Token': token, // Add token in a custom header for debugging
+            'X-Firebase-Token': token.substring(0, 20) + '...', // Truncated token for logs
+            'X-Client-Version': '1.0.0', // Add version for debugging
+            'X-Request-ID': `${Date.now()}-${Math.random().toString(36).substring(2, 9)}` // Unique request ID
           },
-          body: JSON.stringify({
-            id: firebaseUser.uid,
-            email: firebaseUser.email || 'unknown@example.com', // Fallback email
-            username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            photoURL: firebaseUser.photoURL
-          })
+          body: JSON.stringify(userData)
         });
 
-        console.log('API response status:', response.status);
+        console.log('[Auth] API response status:', response.status);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Failed to fetch user data (attempt ${retryCount + 1}):`, errorText);
+          let errorText = '';
+          try {
+            // Try to parse as JSON first
+            const errorJson = await response.json();
+            errorText = JSON.stringify(errorJson);
+          } catch {
+            // If not JSON, get as text
+            errorText = await response.text();
+          }
           
-          // Only retry on certain status codes
-          if (response.status === 401 || response.status === 403) {
+          console.error(`[Auth] Failed to fetch user data (attempt ${retryCount + 1}):`, errorText);
+          
+          // Only retry on certain status codes or network errors
+          if (response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500) {
             lastError = new Error(`Auth error: ${response.status} - ${errorText}`);
             retryCount++;
+            
+            // Exponential backoff
+            const delay = Math.min(1000 * (2 ** retryCount), 8000);
+            console.log(`[Auth] Retrying in ${delay}ms... (${retryCount}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
           
-          throw new Error(`Failed to fetch user data: ${response.status} - ${errorText}`);
+          throw new Error(`[Auth] Failed to fetch user data: ${response.status} - ${errorText}`);
         }
 
-        const data = await response.json();
-        console.log('User data retrieved successfully');
-        return data;
+        // Successfully got a response, try to parse it
+        try {
+          const data = await response.json();
+          console.log('[Auth] User data retrieved successfully:', data ? 'Data present' : 'Empty data');
+          
+          // Validate required fields in user data
+          if (!data || !data.id || !data.email) {
+            console.error('[Auth] Retrieved user data is incomplete:', data);
+            throw new Error('Incomplete user data received from server');
+          }
+          
+          console.log('[Auth] User authenticated and data loaded successfully');
+          return data;
+        } catch (parseError) {
+          console.error('[Auth] Error parsing response JSON:', parseError);
+          throw new Error('Invalid response format from server');
+        }
       } catch (err) {
-        console.error(`Error fetching user data (attempt ${retryCount + 1}):`, err);
+        console.error(`[Auth] Error fetching user data (attempt ${retryCount + 1}):`, err);
         lastError = err;
         
         // Additional detailed logging
         if (err instanceof Error) {
-          console.error('Error details:', err.message);
-          if (err.stack) console.error('Stack trace:', err.stack);
+          console.error('[Auth] Error details:', err.message);
+          if (err.stack) console.error('[Auth] Stack trace:', err.stack);
         }
         
         retryCount++;
         
         if (retryCount <= maxRetries) {
-          console.log(`Retrying in 1 second... (${retryCount}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Exponential backoff
+          const delay = Math.min(1000 * (2 ** retryCount), 8000);
+          console.log(`[Auth] Retrying in ${delay}ms... (${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
     
     // If we've exhausted all retries, throw the last error
-    console.error('All fetch user data attempts failed');
+    console.error('[Auth] All fetch user data attempts failed');
     throw lastError;
   };
 
