@@ -10,7 +10,7 @@ dotenv.config();
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
 
-// Load database URL from environment or use the hardcoded value
+// Construct database URL from environment variables or use provided credentials
 const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:U9vZRO8g03jvRKrA@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
 console.log("Using DATABASE_URL:", DATABASE_URL.substring(0, 15) + "...");
 

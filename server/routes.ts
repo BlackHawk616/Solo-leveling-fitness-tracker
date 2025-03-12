@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getPool } = await import('./db.js');
       const pool = await getPool();
       const client = await pool.connect();
-      await client.query('SELECT 1');
+      const [rows] = await client.query('SELECT 1'); //Updated destructuring
       client.release();
       dbConnection = true;
     } catch (err) {
@@ -111,9 +111,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dbPool = await getPool();
           
           // Extra verification of database connection
-          const testResult = await dbPool.query('SELECT 1 AS test');
-          if (testResult.rows && testResult.rows.length > 0) {
-            console.log('✅ Database connection fully verified with test query:', testResult.rows[0]);
+          const [rows] = await dbPool.query('SELECT 1 AS test'); // Updated destructuring
+          if (Array.isArray(rows) && rows.length > 0) {
+            console.log('✅ Database connection fully verified with test query:', rows[0]);
             dbConnectionOk = true;
             break;
           } else {
@@ -166,12 +166,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await client.query('BEGIN');
 
           // First check if user exists
-          const existingUserResult = await client.query(
+          const [existingUsers] = await client.query(
             'SELECT * FROM "users" WHERE "id" = $1', 
             [id]
-          );
+          ); //updated destructuring
 
-          const existingUser = existingUserResult.rows[0];
+          const existingUser = existingUsers[0];
 
           if (existingUser) {
             console.log('✅ Found existing user in transaction');
@@ -180,12 +180,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             console.log('🆕 Creating new user in transaction');
             // Insert new user directly with SQL to avoid any ORM issues
-            const userInsertResult = await client.query(
+            const [userInsertResult] = await client.query(
               'INSERT INTO "users" ("id", "email", "username", "level", "exp", "totalWorkoutSeconds") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
               [id, email, username || email.split('@')[0], 1, 0, 0]
-            );
+            ); //updated destructuring
 
-            const newUser = userInsertResult.rows[0];
+            const newUser = userInsertResult[0];
             console.log('✅ Created new user via transaction:', newUser);
 
             await client.query('COMMIT');
@@ -323,14 +323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('📊 Using direct database query for workouts in Vercel environment');
           const { getPool } = await import('./db.js');
           const pool = await getPool();
-          
+
           if (pool) {
-            const result = await pool.query(
+            const [rows] = await pool.query(
               'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
               [userId]
-            );
-            console.log(`✅ Retrieved ${result.rows.length} workouts directly from database`);
-            return res.json(result.rows);
+            ); //updated destructuring
+            console.log(`✅ Retrieved ${rows.length} workouts directly from database`);
+            return res.json(rows);
           } else {
             console.log('⚠️ Pool not available, falling back to storage interface');
           }
@@ -342,22 +342,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(workouts);
       } catch (dbError) {
         console.error('❌ Database error fetching workouts:', dbError);
-        
+
         // Try fallback approach if initial attempt failed
         try {
           console.log('🔄 Trying alternative workout fetch method');
-          
+
           // Direct SQL query as last resort
           const { getPool } = await import('./db.js');
           const pool = await getPool();
-          
+
           if (pool) {
-            const result = await pool.query(
+            const [rows] = await pool.query(
               'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
               [userId]
-            );
-            console.log(`✅ Retrieved ${result.rows.length} workouts with fallback method`);
-            return res.json(result.rows);
+            );  //updated destructuring
+            console.log(`✅ Retrieved ${rows.length} workouts with fallback method`);
+            return res.json(rows);
           } else {
             throw new Error('Database pool not available for fallback query');
           }
