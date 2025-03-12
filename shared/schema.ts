@@ -1,22 +1,22 @@
-import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, serial, timestamp, json } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: text("id").primaryKey(), // Changed to text for Firebase ID
-  email: text("email").notNull(),
-  username: text("username").notNull(),
-  level: integer("level").notNull().default(1),
-  exp: integer("exp").notNull().default(0),
-  totalWorkoutSeconds: integer("total_workout_seconds").notNull().default(0),
-  currentWorkout: jsonb("current_workout")
+export const users = mysqlTable("users", {
+  id: varchar("id", { length: 128 }).primaryKey(), // Changed to varchar for Firebase ID
+  email: varchar("email", { length: 255 }).notNull(),
+  username: varchar("username", { length: 255 }).notNull(),
+  level: int("level").notNull().default(1),
+  exp: int("exp").notNull().default(0),
+  totalWorkoutSeconds: int("total_workout_seconds").notNull().default(0),
+  currentWorkout: json("current_workout")
 });
 
-export const workouts = pgTable("workouts", {
+export const workouts = mysqlTable("workouts", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id),
-  name: text("name").notNull(),
-  durationSeconds: integer("duration_seconds").notNull(),
+  userId: varchar("user_id", { length: 128 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  durationSeconds: int("duration_seconds").notNull(),
   startedAt: timestamp("started_at").notNull(),
   endedAt: timestamp("ended_at").notNull()
 });

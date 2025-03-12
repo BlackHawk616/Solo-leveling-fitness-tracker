@@ -1,74 +1,107 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import * as mysql from 'mysql2/promise';
+import { drizzle } from 'drizzle-orm/mysql2';
 import * as schema from "../shared/schema.js";
-
-// Configure WebSocket for Neon database
-neonConfig.webSocketConstructor = ws;
 
 // Better logging of environment
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
 
-// Check for DATABASE_URL
-if (!process.env.DATABASE_URL) {
+// Set database URL from the TiDB Cloud connection string provided by the user
+// mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test
+const DATABASE_URL = process.env.DATABASE_URL || "mysql://3FRs1u34xFeTyYH.root:kQ1jo3PPyLgsnBJ4@gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test";
+
+if (!DATABASE_URL) {
   console.error('⚠️ DATABASE_URL environment variable is not set');
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-// Use the provided Neon database URL
-let poolUrl = process.env.DATABASE_URL;
-console.log('Using Neon database credentials provided by user');
+console.log('Using TiDB Cloud database credentials');
 
-console.log('Attempting to connect to database...');
-console.log('Database URL format:', poolUrl.substring(0, 20) + '...' + (poolUrl.includes('sslmode=require') ? ' (with SSL)' : ' (without SSL)'));
+// Parse the database URL to extract connection parameters
+const parseDbUrl = (url: string) => {
+  try {
+    // Expected format: mysql://{username}:{password}@{hostname}:{port}/{database}
+    const regex = /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
+    const match = url.match(regex);
+    
+    if (!match) {
+      throw new Error('Invalid MySQL connection string format');
+    }
+    
+    const [, user, password, host, port, database] = match;
+    
+    return {
+      host,
+      port: parseInt(port, 10),
+      user,
+      password,
+      database,
+    };
+  } catch (error) {
+    console.error('❌ Error parsing database URL:', error);
+    throw error;
+  }
+};
 
-// Create connection pool with retry logic and special Vercel handling
-const createPool = (retries = 3): Promise<Pool> => {
+console.log('Attempting to connect to TiDB database...');
+console.log('Database URL format:', DATABASE_URL.substring(0, 20) + '...');
+
+// Create connection with retry logic
+const createConnection = async (retries = 3): Promise<mysql.Pool> => {
   // Special handling for Vercel's serverless environment
   const isVercel = process.env.VERCEL === '1';
   
-  const pool = new Pool({ 
-    connectionString: poolUrl,
-    connectionTimeoutMillis: isVercel ? 30000 : 15000,  // Longer timeout for Vercel
-    max: isVercel ? 1 : 10,  // Lower max connections on Vercel
-    idleTimeoutMillis: 30000,
-    ssl: { rejectUnauthorized: false }, // Important for Vercel
-    allowExitOnIdle: true
-  });
-
-  // Verify connection works
-  return pool.connect()
-    .then((client) => {
-      console.log('✅ Successfully connected to the database!');
-      client.release();
-      return pool;
-    })
-    .catch((err) => {
-      console.error(`❌ Database connection attempt failed (${retries} retries left):`, err.message);
-      
-      if (retries > 0) {
-        console.log(`🔄 Retrying database connection in 2 seconds...`);
-        return new Promise<Pool>(resolve => 
-          setTimeout(() => resolve(createPool(retries - 1)), 2000)
-        );
-      }
-      
-      console.error('❌ All database connection attempts failed');
-      console.error('Please verify your DATABASE_URL in Vercel environment variables');
-      throw new Error(`Failed to connect to database after multiple attempts: ${err.message}`);
+  try {
+    const connectionConfig = parseDbUrl(DATABASE_URL);
+    
+    // Create connection pool
+    const pool = mysql.createPool({
+      host: connectionConfig.host,
+      port: connectionConfig.port,
+      user: connectionConfig.user,
+      password: connectionConfig.password,
+      database: connectionConfig.database,
+      waitForConnections: true,
+      connectionLimit: isVercel ? 1 : 10, // Lower connection limit in Vercel
+      maxIdle: isVercel ? 1 : 10, // Lower max idle connections in Vercel
+      idleTimeout: 60000, // 60 seconds
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
+      ssl: {} // Enable SSL
     });
+    
+    // Verify connection works
+    const connection = await pool.getConnection();
+    console.log('✅ Successfully connected to the TiDB database!');
+    connection.release();
+    
+    return pool;
+  } catch (err: any) {
+    console.error(`❌ Database connection attempt failed (${retries} retries left):`, err.message);
+    
+    if (retries > 0) {
+      // Use exponential backoff for retries
+      const delay = Math.min(2000 * (2 ** (3 - retries)), 10000);
+      console.log(`🔄 Retrying database connection in ${delay/1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return createConnection(retries - 1);
+    }
+    
+    console.error('❌ All database connection attempts failed');
+    console.error('Please verify your DATABASE_URL environment variable');
+    throw new Error(`Failed to connect to database after multiple attempts: ${err.message}`);
+  }
 };
 
 // Export the pool and db with lazy initialization to help with Vercel cold starts
-let _pool: Pool | null = null;
+let _pool: mysql.Pool | null = null;
 let _db: any = null;
 
 export const getPool = async () => {
   if (!_pool) {
-    _pool = await createPool();
+    _pool = await createConnection();
   }
   return _pool;
 };
@@ -76,17 +109,17 @@ export const getPool = async () => {
 export const getDb = async () => {
   if (!_db) {
     const pool = await getPool();
-    _db = drizzle(pool, { schema });
+    _db = drizzle(pool, { schema, mode: 'default' });
   }
   return _db;
 };
 
-// For backward compatibility - Create a compatible interface
+// Compatibility layer for the rest of the application
 export const pool = {
   connect: async () => {
     const p = await getPool();
     if (!p) throw new Error("Failed to get pool");
-    return p.connect();
+    return p.getConnection();
   },
   query: async (text: string, params?: any[]) => {
     const p = await getPool();
