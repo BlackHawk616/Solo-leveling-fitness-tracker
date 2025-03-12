@@ -1,0 +1,74 @@
+[11:31:57.127] Running build in Washington, D.C., USA (East) – iad1
+[11:31:57.265] Cloning github.com/BlackHawk616/Solo-Leveling-Fitness-Tracker (Branch: main, Commit: 6bcf259)
+[11:31:58.668] Cloning completed: 1.401s
+[11:31:59.980] Restored build cache from previous deployment (8ru81iDMD3fvWaFjPuCLjVs9emc4)
+[11:32:00.056] Running "vercel build"
+[11:32:00.434] Vercel CLI 41.3.2
+[11:32:00.578] WARN! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
+[11:32:01.203] Installing dependencies...
+[11:32:02.439] npm warn EBADENGINE Unsupported engine {
+[11:32:02.440] npm warn EBADENGINE   package: '@capacitor/cli@7.0.1',
+[11:32:02.440] npm warn EBADENGINE   required: { node: '>=20.0.0' },
+[11:32:02.440] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.440] npm warn EBADENGINE }
+[11:32:02.443] npm warn EBADENGINE Unsupported engine {
+[11:32:02.444] npm warn EBADENGINE   package: 'rimraf@6.0.1',
+[11:32:02.444] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.444] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.445] npm warn EBADENGINE }
+[11:32:02.445] npm warn EBADENGINE Unsupported engine {
+[11:32:02.445] npm warn EBADENGINE   package: 'glob@11.0.1',
+[11:32:02.445] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.446] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.446] npm warn EBADENGINE }
+[11:32:02.446] npm warn EBADENGINE Unsupported engine {
+[11:32:02.446] npm warn EBADENGINE   package: 'jackspeak@4.1.0',
+[11:32:02.446] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.447] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.447] npm warn EBADENGINE }
+[11:32:02.447] npm warn EBADENGINE Unsupported engine {
+[11:32:02.447] npm warn EBADENGINE   package: 'lru-cache@11.0.2',
+[11:32:02.448] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.448] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.448] npm warn EBADENGINE }
+[11:32:02.448] npm warn EBADENGINE Unsupported engine {
+[11:32:02.448] npm warn EBADENGINE   package: 'minimatch@10.0.1',
+[11:32:02.449] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.451] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.452] npm warn EBADENGINE }
+[11:32:02.452] npm warn EBADENGINE Unsupported engine {
+[11:32:02.452] npm warn EBADENGINE   package: 'path-scurry@2.0.0',
+[11:32:02.452] npm warn EBADENGINE   required: { node: '20 || >=22' },
+[11:32:02.452] npm warn EBADENGINE   current: { node: 'v18.20.6', npm: '10.8.2' }
+[11:32:02.452] npm warn EBADENGINE }
+[11:32:03.190] 
+[11:32:03.190] up to date in 2s
+[11:32:03.191] 
+[11:32:03.191] 69 packages are looking for funding
+[11:32:03.191]   run `npm fund` for details
+[11:32:03.203] Running "npm run build"
+[11:32:03.365] 
+[11:32:03.366] > rest-express@1.0.0 build
+[11:32:03.366] > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --tsconfig=tsconfig.vercel.json --alias:@/=./client/src/ --alias:@shared/=./shared/
+[11:32:03.366] 
+[11:32:03.724] [36mvite v5.4.14 [32mbuilding for production...[36m[39m
+[11:32:03.789] transforming...
+[11:32:10.158] [32m✓[39m 2086 modules transformed.
+[11:32:10.661] rendering chunks...
+[11:32:10.677] computing gzip size...
+[11:32:10.702] [2m../dist/public/[22m[32mindex.html                 [39m[1m[2m  1.87 kB[22m[1m[22m[2m │ gzip:   0.71 kB[22m
+[11:32:10.703] [2m../dist/public/[22m[2massets/[22m[35mindex-DOlvsUj-.css  [39m[1m[2m 58.33 kB[22m[1m[22m[2m │ gzip:  10.52 kB[22m
+[11:32:10.703] [2m../dist/public/[22m[2massets/[22m[36mindex-Ch-8vtn3.js   [39m[1m[33m847.93 kB[39m[22m[2m │ gzip: 225.63 kB[22m
+[11:32:10.703] [33m
+[11:32:10.704] (!) Some chunks are larger than 500 kB after minification. Consider:
+[11:32:10.704] - Using dynamic import() to code-split the application
+[11:32:10.704] - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+[11:32:10.704] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[11:32:10.704] [32m✓ built in 6.96s[39m
+[11:32:10.741] ✘ [ERROR] Invalid alias name: "@/"
+[11:32:10.742] 
+[11:32:10.742] ✘ [ERROR] Invalid alias name: "@shared/"
+[11:32:10.742] 
+[11:32:10.742] 2 errors
+[11:32:10.754] Error: Command "npm run build" exited with 1
+[11:32:10.950] 
