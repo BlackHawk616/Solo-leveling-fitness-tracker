@@ -76,7 +76,16 @@ export default function HomePage() {
     queryKey: ["workouts", firebaseUser?.uid],
     queryFn: async () => {
       if (!firebaseUser) return [];
-      const response = await fetch(`/api/workouts/${firebaseUser.uid}`);
+      
+      // Get fresh Firebase token for authentication
+      const token = await firebaseUser.getIdToken(true);
+      
+      const response = await fetch(`/api/workouts/${firebaseUser.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       if (!response.ok) throw new Error('Failed to fetch workouts');
       const data = await response.json();
       // Sort by most recent first
@@ -114,11 +123,15 @@ export default function HomePage() {
   const workoutMutation = useMutation({
     mutationFn: async (data: { name: string; durationSeconds: number }) => {
       if (!firebaseUser || !user) throw new Error("Not authenticated");
+      
+      // Get fresh Firebase token for authentication
+      const token = await firebaseUser.getIdToken(true);
 
       const response = await fetch('/api/workouts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           userId: firebaseUser.uid,
