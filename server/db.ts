@@ -1,4 +1,3 @@
-
 import * as mysql from 'mysql2/promise';
 import { drizzle } from 'drizzle-orm/mysql2';
 import * as schema from "../shared/schema.js";
@@ -18,29 +17,29 @@ if (!DATABASE_URL) {
   );
 }
 
-// Parse the database URL to extract connection parameters
+// Create connection config from MySQL URL
 const parseDbUrl = (url: string) => {
   try {
     console.log('Parsing database URL, starts with:', url.substring(0, 15));
-    
+
     // Expected format: mysql://{username}:{password}@{hostname}:{port}/{database}
     const regex = /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
     const match = url.match(regex);
-    
+
     if (!match) {
       console.error('❌ Connection string does not match the required pattern');
       console.error(`❌ Received URL starts with: ${url.substring(0, 15)}...`);
       throw new Error('Invalid MySQL connection string format');
     }
-    
+
     const [, user, password, host, port, database] = match;
-    
+
     console.log(`✅ Parsed connection details:`);
     console.log(`  - Host: ${host}`);
     console.log(`  - Port: ${port}`);
     console.log(`  - User: ${user}`);
     console.log(`  - Database: ${database}`);
-    
+
     return {
       host,
       port: parseInt(port, 10),
@@ -58,10 +57,10 @@ const parseDbUrl = (url: string) => {
 const createConnection = async (retries = 5): Promise<mysql.Pool> => {
   // Special handling for Vercel's serverless environment
   const isVercel = process.env.VERCEL === '1';
-  
+
   try {
     const connectionConfig = parseDbUrl(DATABASE_URL);
-    
+
     // Create connection pool with TiDB-specific settings
     const pool = mysql.createPool({
       host: connectionConfig.host,
@@ -79,7 +78,7 @@ const createConnection = async (retries = 5): Promise<mysql.Pool> => {
       connectTimeout: 10000, // 10 seconds
       timezone: '+00:00' // UTC timezone
     });
-    
+
     // Verify connection works with a simple query
     const connection = await pool.getConnection();
     try {
@@ -94,11 +93,11 @@ const createConnection = async (retries = 5): Promise<mysql.Pool> => {
     } finally {
       connection.release();
     }
-    
+
     return pool;
   } catch (err: any) {
     console.error(`❌ Database connection attempt failed (${retries} retries left):`, err.message);
-    
+
     if (retries > 0) {
       // Use exponential backoff for retries
       const delay = Math.min(2000 * (2 ** (5 - retries)), 10000);
@@ -106,7 +105,7 @@ const createConnection = async (retries = 5): Promise<mysql.Pool> => {
       await new Promise(resolve => setTimeout(resolve, delay));
       return createConnection(retries - 1);
     }
-    
+
     console.error('❌ All database connection attempts failed');
     console.error('Please verify your DATABASE_URL environment variable');
     throw new Error(`Failed to connect to database after multiple attempts: ${err.message}`);
@@ -149,16 +148,14 @@ export const checkDatabaseConnection = async (attempts = 1): Promise<boolean> =>
   }
 };
 
-// Compatibility layer for the rest of the application
+// For compatibility with existing code
 export const pool = {
   connect: async () => {
     const p = await getPool();
-    if (!p) throw new Error("Failed to get pool");
     return p.getConnection();
   },
   query: async (text: string, params?: any[]) => {
     const p = await getPool();
-    if (!p) throw new Error("Failed to get pool");
     return p.query(text, params || []);
   },
   end: async () => {
@@ -170,9 +167,8 @@ export const pool = {
   }
 };
 
-// Create the drizzle client with the getDb function
+// For compatibility with existing code using drizzle
 export const db = {
-  // Proxy to forward all operations to the real db
   async query(...args: any[]) {
     const realDb = await getDb();
     return realDb.query(...args);
@@ -194,6 +190,51 @@ export const db = {
     return realDb.delete(...args);
   }
 };
+
+// Create necessary tables if they don't exist yet
+const initializeDatabase = async () => {
+  try {
+    const pool = await getPool();
+
+    // Create users table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(128) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        username VARCHAR(255) NOT NULL,
+        level INT NOT NULL DEFAULT 1,
+        exp INT NOT NULL DEFAULT 0,
+        total_workout_seconds INT NOT NULL DEFAULT 0,
+        current_workout JSON
+      )
+    `);
+    console.log('✅ Users table initialized');
+
+    // Create workouts table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workouts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(128) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        duration_seconds INT NOT NULL,
+        started_at TIMESTAMP NOT NULL,
+        ended_at TIMESTAMP NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    console.log('✅ Workouts table initialized');
+
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize database tables:', error);
+    return false;
+  }
+};
+
+// Initialize tables when the module is imported
+initializeDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+});
 
 // Track if we're already closing the pool
 let isClosingPool = false;

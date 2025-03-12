@@ -1,7 +1,7 @@
 import { User, Workout, InsertUser, InsertWorkout, users, workouts } from "../shared/schema.js";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { getDb } from "./db.js";
+import { getDb, getPool } from "./db.js";
 import { eq, and, gte, lte } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);

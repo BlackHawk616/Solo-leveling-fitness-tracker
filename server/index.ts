@@ -47,13 +47,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// Placeholder database connection check function
+async function checkDatabaseConnection() {
+  console.log('Checking database connection...');
+  // Replace this with your actual database connection logic
+  // This is a placeholder and will always return true for demonstration purposes.
+  // In a real application, you should connect to your TiDB Cloud instance and verify connectivity.
+  return true; 
+}
+
 (async () => {
   console.log('Starting server...');
-  
+
   // Log environment information
   console.log('📊 Environment:', process.env.NODE_ENV || 'development');
   console.log('🌐 Running on Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
-  
+
   // Log important environment variables (without revealing secrets)
   console.log('🔍 DATABASE_URL configured:', !!process.env.DATABASE_URL);
   if (process.env.DATABASE_URL) {
@@ -61,7 +70,7 @@ app.use((req, res, next) => {
     console.log('🔍 DATABASE_URL prefix:', urlPrefix + '...');
     console.log('🔍 DATABASE_URL contains SSL mode:', process.env.DATABASE_URL.includes('sslmode=require'));
   }
-  
+
   // Create a special header for Vercel deployments
   if (process.env.VERCEL === '1') {
     app.use((req, res, next) => {
@@ -72,7 +81,22 @@ app.use((req, res, next) => {
       next();
     });
   }
-  
+
+  // Test database connection before starting server
+  try {
+    const isConnected = await checkDatabaseConnection();
+    if (!isConnected) {
+      console.error('❌ Database connection check failed');
+      console.error('⚠️ Starting server anyway, but database operations may fail');
+    } else {
+      console.log('✅ Database connection check passed');
+    }
+  } catch (err) {
+    console.error('❌ Database connection check error:', err);
+    console.error('⚠️ Starting server anyway, but database operations may fail');
+  }
+
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
