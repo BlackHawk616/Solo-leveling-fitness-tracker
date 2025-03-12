@@ -37,8 +37,8 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     try {
       const db = await getDb();
-      const [user] = await db.select().from(users).where(eq(users.id, id));
-      return user;
+      const result = await db.select().from(users).where(eq(users.id, id));
+      return result[0];
     } catch (error) {
       console.error('Error in getUser:', error);
       throw error;
@@ -47,7 +47,6 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByFirebaseId(firebaseId: string): Promise<User | undefined> {
     try {
-      // Firebase ID is stored in the id field
       return this.getUser(firebaseId);
     } catch (error) {
       console.error('Error in getUserByFirebaseId:', error);
@@ -57,27 +56,30 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(firebaseId: string, insertUser: InsertUser): Promise<User> {
     try {
-      const db = await getDb();
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, firebaseId));
+      const pool = await getPool();
 
-      if (existingUser) {
-        return existingUser;
+      // Check if user exists
+      const [existingUsers] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [firebaseId]
+      );
+
+      if (existingUsers && existingUsers.length > 0) {
+        return existingUsers[0] as User;
       }
 
-      const [user] = await db
-        .insert(users)
-        .values({
-          id: firebaseId,
-          ...insertUser,
-          level: 1,
-          exp: 0,
-          totalWorkoutSeconds: 0
-        })
-        .returning();
-      return user;
+      // Insert new user
+      const [result] = await pool.query(
+        'INSERT INTO users (id, email, username, level, exp, total_workout_seconds) VALUES (?, ?, ?, ?, ?, ?)',
+        [firebaseId, insertUser.email, insertUser.username, 1, 0, 0]
+      );
+
+      const [newUser] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [firebaseId]
+      );
+
+      return newUser[0] as User;
     } catch (error) {
       console.error('Error in createUser:', error);
       throw error;
@@ -86,15 +88,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateUsername(userId: string, username: string): Promise<User> {
     try {
-      const db = await getDb();
-      const [user] = await db
-        .update(users)
-        .set({ username })
-        .where(eq(users.id, userId))
-        .returning();
+      const pool = await getPool();
+      await pool.query(
+        'UPDATE users SET username = ? WHERE id = ?',
+        [username, userId]
+      );
 
-      if (!user) throw new Error("User not found");
-      return user;
+      const [users] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (!users || users.length === 0) throw new Error("User not found");
+      return users[0] as User;
     } catch (error) {
       console.error('Error in updateUsername:', error);
       throw error;
@@ -103,13 +109,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserExp(userId: string, expGained: number): Promise<User> {
     try {
-      const db = await getDb();
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
+      const pool = await getPool();
+      const [users] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [userId]
+      );
 
-      if (!user) throw new Error("User not found");
+      if (!users || users.length === 0) throw new Error("User not found");
+      const user = users[0] as User;
 
       const newExp = user.exp + expGained;
       let newLevel = user.level;
@@ -118,16 +125,17 @@ export class DatabaseStorage implements IStorage {
         newLevel++;
       }
 
-      const [updatedUser] = await db
-        .update(users)
-        .set({
-          exp: newExp,
-          level: newLevel
-        })
-        .where(eq(users.id, userId))
-        .returning();
+      await pool.query(
+        'UPDATE users SET exp = ?, level = ? WHERE id = ?',
+        [newExp, newLevel, userId]
+      );
 
-      return updatedUser;
+      const [updatedUsers] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [userId]
+      );
+
+      return updatedUsers[0] as User;
     } catch (error) {
       console.error('Error in updateUserExp:', error);
       throw error;
@@ -136,31 +144,31 @@ export class DatabaseStorage implements IStorage {
 
   async createWorkout(userId: string, workout: InsertWorkout): Promise<Workout> {
     try {
-      const db = await getDb();
-      const [newWorkout] = await db
-        .insert(workouts)
-        .values({
-          userId,
-          ...workout
-        })
-        .returning();
+      const pool = await getPool();
+      await pool.query(
+        'INSERT INTO workouts (user_id, name, duration_seconds, started_at, ended_at) VALUES (?, ?, ?, ?, ?)',
+        [userId, workout.name, workout.durationSeconds, workout.startedAt, workout.endedAt]
+      );
 
-      // Update user's total workout seconds
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
+      const [users] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [userId]
+      );
 
-      if (!user) throw new Error("User not found");
+      if (!users || users.length === 0) throw new Error("User not found");
+      const user = users[0] as User;
 
-      await db
-        .update(users)
-        .set({
-          totalWorkoutSeconds: user.totalWorkoutSeconds + workout.durationSeconds
-        })
-        .where(eq(users.id, userId));
+      await pool.query(
+        'UPDATE users SET total_workout_seconds = ? WHERE id = ?',
+        [user.totalWorkoutSeconds + workout.durationSeconds, userId]
+      );
 
-      return newWorkout;
+      const [workouts] = await pool.query(
+        'SELECT * FROM workouts WHERE user_id = ? ORDER BY started_at DESC LIMIT 1',
+        [userId]
+      );
+
+      return workouts[0] as Workout;
     } catch (error) {
       console.error('Error in createWorkout:', error);
       throw error;
@@ -169,12 +177,12 @@ export class DatabaseStorage implements IStorage {
 
   async getWorkouts(userId: string): Promise<Workout[]> {
     try {
-      const db = await getDb();
-      return db
-        .select()
-        .from(workouts)
-        .where(eq(workouts.userId, userId))
-        .orderBy(workouts.startedAt);
+      const pool = await getPool();
+      const [workouts] = await pool.query(
+        'SELECT * FROM workouts WHERE user_id = ? ORDER BY started_at DESC',
+        [userId]
+      );
+      return workouts as Workout[];
     } catch (error) {
       console.error('Error in getWorkouts:', error);
       throw error;
@@ -183,25 +191,19 @@ export class DatabaseStorage implements IStorage {
 
   async getDailyWorkoutSeconds(userId: string, date: Date): Promise<number> {
     try {
-      const db = await getDb();
+      const pool = await getPool();
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
 
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await db
-        .select({ total: workouts.durationSeconds })
-        .from(workouts)
-        .where(
-          and(
-            eq(workouts.userId, userId),
-            gte(workouts.startedAt, startOfDay),
-            lte(workouts.startedAt, endOfDay)
-          )
-        );
+      const [workouts] = await pool.query(
+        'SELECT SUM(duration_seconds) as total FROM workouts WHERE user_id = ? AND started_at BETWEEN ? AND ?',
+        [userId, startOfDay, endOfDay]
+      );
 
-      return result.reduce((acc, row) => acc + (row.total || 0), 0);
+      return workouts[0]?.total || 0;
     } catch (error) {
       console.error('Error in getDailyWorkoutSeconds:', error);
       throw error;
@@ -214,15 +216,19 @@ export class DatabaseStorage implements IStorage {
     elapsedSeconds: number;
   } | null): Promise<User> {
     try {
-      const db = await getDb();
-      const [user] = await db
-        .update(users)
-        .set({ currentWorkout: workout })
-        .where(eq(users.id, userId))
-        .returning();
+      const pool = await getPool();
+      await pool.query(
+        'UPDATE users SET current_workout = ? WHERE id = ?',
+        [workout ? JSON.stringify(workout) : null, userId]
+      );
 
-      if (!user) throw new Error("User not found");
-      return user;
+      const [users] = await pool.query(
+        'SELECT * FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (!users || users.length === 0) throw new Error("User not found");
+      return users[0] as User;
     } catch (error) {
       console.error('Error in updateUserCurrentWorkout:', error);
       throw error;

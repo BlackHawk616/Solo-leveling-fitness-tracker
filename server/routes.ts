@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getPool } = await import('./db.js');
       const pool = await getPool();
       const client = await pool.connect();
-      const [rows] = await client.query('SELECT 1'); //Updated destructuring
+      const [rows] = await client.query('SELECT 1'); 
       client.release();
       dbConnection = true;
     } catch (err) {
@@ -82,21 +82,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nodeEnv: process.env.NODE_ENV || 'development'
       });
 
-      // Log authorization header if present
-      const authHeader = req.headers.authorization;
-      console.log('🔑 Auth header present:', !!authHeader);
-      if (authHeader) {
-        console.log('🔑 Auth header length:', authHeader.length);
-        console.log('🔑 Auth header type:', authHeader.startsWith('Bearer ') ? 'Bearer token' : 'Other format');
-      }
-
       if (!id || !email) {
         console.log('⚠️ Missing required user data', { id, email });
         return res.status(400).json({ message: 'Missing required user data' });
       }
-      
-      // Proceed with user creation regardless of token verification
-      // This ensures that users are created in the database after Firebase authentication
+
       console.log('✅ Proceeding with user creation for Firebase ID:', id);
 
       // Enhanced error handling for database operations
@@ -104,32 +94,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let dbPool = null;
 
       // Try connecting to database with several attempts
-      for (let attempt = 1; attempt <= 5; attempt++) {  // Increased to 5 attempts
+      for (let attempt = 1; attempt <= 5; attempt++) {
         try {
           console.log(`🔌 Checking database connection (attempt ${attempt})...`);
           const { getPool } = await import('./db.js');
           dbPool = await getPool();
-          
+
           // Extra verification of database connection
-          const [rows] = await dbPool.query('SELECT 1 AS test'); // Updated destructuring
+          const [rows] = await dbPool.query('SELECT 1 AS test');
           if (Array.isArray(rows) && rows.length > 0) {
             console.log('✅ Database connection fully verified with test query:', rows[0]);
             dbConnectionOk = true;
             break;
           } else {
             console.error('⚠️ Database connection test query returned no results');
-            // Continue to next attempt
           }
         } catch (dbError) {
           console.error(`❌ Database connection failed (attempt ${attempt}):`, dbError);
 
           if (attempt === 5) {
-            console.error('🔍 DATABASE_URL present:', !!process.env.DATABASE_URL);
-            if (process.env.DATABASE_URL) {
-              console.error('🔍 DATABASE_URL length:', process.env.DATABASE_URL.length);
-              console.error('🔍 DATABASE_URL format check:', 
-                process.env.DATABASE_URL.startsWith('mysql://') ? 'Valid format' : 'Invalid format');
-            }
             return res.status(503).json({ 
               message: "Failed to establish database connection", 
               environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other', 
@@ -154,85 +137,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Now proceed with user lookup/creation with transaction for data consistency
+      // Now proceed with user lookup/creation with the storage interface
       try {
         console.log('🔍 Looking up or creating user with Firebase ID:', id);
 
-        // Try using a transaction for better reliability
-        if (!dbPool) throw new Error("Database pool is not available");
-        const client = await dbPool.connect();
+        const userToCreate = {
+          email,
+          username: username || email.split('@')[0],
+          photoURL 
+        };
 
-        try {
-          await client.query('BEGIN');
-
-          // First check if user exists
-          const [existingUsers] = await client.query(
-            'SELECT * FROM "users" WHERE "id" = $1', 
-            [id]
-          ); //updated destructuring
-
-          const existingUser = existingUsers[0];
-
-          if (existingUser) {
-            console.log('✅ Found existing user in transaction');
-            await client.query('COMMIT');
-            return res.json(existingUser);
-          } else {
-            console.log('🆕 Creating new user in transaction');
-            // Insert new user directly with SQL to avoid any ORM issues
-            const [userInsertResult] = await client.query(
-              'INSERT INTO "users" ("id", "email", "username", "level", "exp", "totalWorkoutSeconds") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-              [id, email, username || email.split('@')[0], 1, 0, 0]
-            ); //updated destructuring
-
-            const newUser = userInsertResult[0];
-            console.log('✅ Created new user via transaction:', newUser);
-
-            await client.query('COMMIT');
-            return res.status(201).json(newUser);
-          }
-        } catch (txError) {
-          await client.query('ROLLBACK');
-          console.error('❌ Transaction error:', txError);
-          throw txError;
-        } finally {
-          client.release();
-        }
+        const user = await storage.createUser(id, userToCreate);
+        console.log('✅ Created new user successfully:', JSON.stringify(user));
+        return res.status(201).json(user);
       } catch (userOpError) {
         console.error('❌ Error in user lookup/creation:', userOpError);
-
-        // Last resort fallback - try the original storage method
-        try {
-          console.log('🔄 Trying fallback method for user lookup/creation');
-
-          // Debug storage object
-          console.log('🔧 Storage methods available:', Object.keys(storage));
-
-          const existingUser = await storage.getUserByFirebaseId(id);
-          console.log('🔍 Existing user lookup result:', existingUser ? 'Found' : 'Not found');
-
-          if (existingUser) {
-            console.log('✅ Returning existing user data from fallback');
-            return res.json(existingUser);
-          } else {
-            console.log('🆕 Creating new user with ID using fallback:', id);
-            const userToCreate = {
-              email,
-              username: username || email.split('@')[0],
-              photoURL 
-            };
-
-            const user = await storage.createUser(id, userToCreate);
-            console.log('✅ Created new user successfully with fallback:', JSON.stringify(user));
-            return res.status(201).json(user);
-          }
-        } catch (fallbackError) {
-          console.error('❌ Fallback method also failed:', fallbackError);
-          return res.status(500).json({ 
-            message: "Failed to create/lookup user after multiple attempts", 
-            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
-          });
-        }
+        return res.status(500).json({ 
+          message: "Failed to create/lookup user", 
+          error: userOpError instanceof Error ? userOpError.message : String(userOpError)
+        });
       }
     } catch (error) {
       console.error('User creation error:', error);
@@ -323,12 +246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('📊 Using direct database query for workouts in Vercel environment');
           const { getPool } = await import('./db.js');
           const pool = await getPool();
-
           if (pool) {
             const [rows] = await pool.query(
               'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
               [userId]
-            ); //updated destructuring
+            ); 
             console.log(`✅ Retrieved ${rows.length} workouts directly from database`);
             return res.json(rows);
           } else {
@@ -355,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const [rows] = await pool.query(
               'SELECT * FROM "workouts" WHERE "userId" = $1 ORDER BY "startedAt" DESC', 
               [userId]
-            );  //updated destructuring
+            );  
             console.log(`✅ Retrieved ${rows.length} workouts with fallback method`);
             return res.json(rows);
           } else {
@@ -363,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (fallbackError) {
           console.error('❌ All workout fetch methods failed:', fallbackError);
-          throw dbError; // Throw original error for consistent error messages
+          throw dbError; 
         }
       }
     } catch (error) {
