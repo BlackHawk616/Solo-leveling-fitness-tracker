@@ -5,15 +5,32 @@ import { insertWorkoutSchema } from "../shared/schema.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Temporary debug endpoint - REMOVE AFTER DEPLOYMENT DEBUG
-  app.get("/api/debug-env", (req, res) => {
+  app.get("/api/debug-env", async (req, res) => {
     const hasDbUrl = !!process.env.DATABASE_URL;
     const dbUrlLength = process.env.DATABASE_URL?.length || 0;
     const hasSslMode = process.env.DATABASE_URL?.includes('sslmode=require');
+    
+    // Test database connection
+    let dbConnection = false;
+    let dbError = null;
+    
+    try {
+      // Import pool from db.ts
+      const { pool } = await import('./db.js');
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      dbConnection = true;
+    } catch (err) {
+      dbError = err instanceof Error ? err.message : String(err);
+    }
 
     res.json({
       hasDbUrl,
       dbUrlLength,
       hasSslMode,
+      dbConnection,
+      dbError,
       message: "Database configuration debug info"
     });
   });
@@ -23,25 +40,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('POST /api/users - Request body:', req.body);
       const { id, email, username } = req.body;
 
+      if (!id) {
+        console.error('Missing required field: id');
+        return res.status(400).json({ message: "Missing required field: id" });
+      }
+
       // Debug log for incoming data
       console.log('Attempting to create/fetch user with:', { id, email, username });
 
-      const existingUser = await storage.getUserByFirebaseId(id);
-      console.log('Existing user found:', existingUser);
+      try {
+        const existingUser = await storage.getUserByFirebaseId(id);
+        console.log('Existing user found:', existingUser);
 
-      if (existingUser) {
-        res.json(existingUser);
-      } else {
-        const user = await storage.createUser(id, {
-          email,
-          username
+        if (existingUser) {
+          return res.json(existingUser);
+        } else {
+          try {
+            const user = await storage.createUser(id, {
+              email,
+              username
+            });
+            console.log('Created new user:', user);
+            return res.status(201).json(user);
+          } catch (createError) {
+            console.error('Error creating new user:', createError);
+            return res.status(500).json({ 
+              message: "Failed to create user", 
+              error: createError instanceof Error ? createError.message : String(createError) 
+            });
+          }
+        }
+      } catch (lookupError) {
+        console.error('Error looking up existing user:', lookupError);
+        return res.status(500).json({ 
+          message: "Failed to lookup user", 
+          error: lookupError instanceof Error ? lookupError.message : String(lookupError) 
         });
-        console.log('Created new user:', user);
-        res.status(201).json(user);
       }
     } catch (error) {
       console.error('User creation error:', error);
-      res.status(500).json({ message: "Failed to create user" });
+      return res.status(500).json({ 
+        message: "Failed to process user request", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 

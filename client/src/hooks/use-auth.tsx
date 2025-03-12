@@ -37,7 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) return null;
 
     try {
+      console.log('Fetching user data for:', firebaseUser.uid);
       const token = await firebaseUser.getIdToken(true); // Force refresh token
+      
+      console.log('Got token, making API request to /api/users');
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
@@ -52,16 +55,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
       });
 
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to fetch user data:', errorText);
-        throw new Error(`Failed to fetch user data: ${errorText}`);
+        throw new Error(`Failed to fetch user data: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('User data retrieved successfully');
       return data;
     } catch (err) {
       console.error('Error fetching user data:', err);
+      // Additional detailed logging
+      if (err instanceof Error) {
+        console.error('Error details:', err.message);
+        if (err.stack) console.error('Stack trace:', err.stack);
+      }
       throw err;
     }
   };
@@ -135,10 +146,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async () => {
       try {
         setError(null);
+        console.log('Starting Google sign-in process');
         const result = await signInWithPopup(auth, googleProvider);
-        const userData = await fetchUserData(result.user);
-        setUser(userData);
-        return result.user;
+        console.log('Google authentication successful, user:', result.user.uid);
+        
+        try {
+          console.log('Fetching user data from backend');
+          const userData = await fetchUserData(result.user);
+          console.log('User data fetched successfully');
+          setUser(userData);
+          return result.user;
+        } catch (fetchErr) {
+          console.error('Error fetching user data after successful Google login:', fetchErr);
+          // Don't fail the sign-in if fetching user data fails
+          // Just return the Firebase user and let the app handle the missing data
+          setUser(null);
+          throw new Error('Authentication successful, but failed to retrieve user data from database. Please try again or contact support.');
+        }
       } catch (err) {
         console.error('Google sign-in error:', err);
         const firebaseError = err as { code?: string, message: string };
