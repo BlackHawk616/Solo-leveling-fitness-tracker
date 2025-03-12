@@ -18,28 +18,15 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Format database URL appropriately
+// Use the provided Neon database URL
 let poolUrl = process.env.DATABASE_URL;
-
-// Add sslmode if missing
-if (!poolUrl.includes('sslmode=')) {
-  poolUrl = poolUrl.includes('?') 
-    ? `${poolUrl}&sslmode=require` 
-    : `${poolUrl}?sslmode=require`;
-  console.log('Added sslmode=require to DATABASE_URL');
-}
-
-// Add pooler if missing (Neon specific optimization)
-if (!poolUrl.includes('-pooler.') && poolUrl.includes('.us-east-2')) {
-  poolUrl = poolUrl.replace('.us-east-2', '-pooler.us-east-2');
-  console.log('Added pooler to DATABASE_URL for better connection management');
-}
+console.log('Using Neon database credentials provided by user');
 
 console.log('Attempting to connect to database...');
 console.log('Database URL format:', poolUrl.substring(0, 20) + '...' + (poolUrl.includes('sslmode=require') ? ' (with SSL)' : ' (without SSL)'));
 
 // Create connection pool with retry logic
-const createPool = (retries = 3) => {
+const createPool = (retries = 3): Promise<Pool> => {
   const pool = new Pool({ 
     connectionString: poolUrl,
     connectionTimeoutMillis: 15000,  // Increased timeout for Vercel
@@ -60,8 +47,9 @@ const createPool = (retries = 3) => {
       
       if (retries > 0) {
         console.log(`🔄 Retrying database connection in 2 seconds...`);
-        return new Promise(resolve => setTimeout(resolve, 2000))
-          .then(() => createPool(retries - 1));
+        return new Promise<Pool>(resolve => 
+          setTimeout(() => resolve(createPool(retries - 1)), 2000)
+        );
       }
       
       console.error('❌ All database connection attempts failed');
@@ -89,15 +77,17 @@ export const getDb = async () => {
   return _db;
 };
 
-// For backward compatibility
+// For backward compatibility - Create a compatible interface
 export const pool = {
   connect: async () => {
     const p = await getPool();
+    if (!p) throw new Error("Failed to get pool");
     return p.connect();
   },
-  query: async (...args: any[]) => {
+  query: async (text: string, params?: any[]) => {
     const p = await getPool();
-    return p.query(...args);
+    if (!p) throw new Error("Failed to get pool");
+    return p.query(text, params);
   },
   end: async () => {
     if (_pool) {
@@ -108,8 +98,30 @@ export const pool = {
   }
 };
 
-// Create the drizzle client with the pool
-export const db = drizzle(pool, { schema });
+// Create the drizzle client with the getDb function
+export const db = {
+  // Proxy to forward all operations to the real db
+  async query(...args: any[]) {
+    const realDb = await getDb();
+    return realDb.query(...args);
+  },
+  async select(...args: any[]) {
+    const realDb = await getDb();
+    return realDb.select(...args);
+  },
+  async insert(...args: any[]) {
+    const realDb = await getDb();
+    return realDb.insert(...args);
+  },
+  async update(...args: any[]) {
+    const realDb = await getDb();
+    return realDb.update(...args);
+  },
+  async delete(...args: any[]) {
+    const realDb = await getDb();
+    return realDb.delete(...args);
+  }
+};
 
 // Track if we're already closing the pool
 let isClosingPool = false;

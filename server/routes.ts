@@ -92,6 +92,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('⚠️ Missing required user data', { id, email });
         return res.status(400).json({ message: 'Missing required user data' });
       }
+      
+      // Proceed with user creation regardless of token verification
+      // This ensures that users are created in the database after Firebase authentication
+      console.log('✅ Proceeding with user creation for Firebase ID:', id);
 
       // Enhanced error handling for database operations
       let dbConnectionOk = false;
@@ -138,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('🔍 Looking up or creating user with Firebase ID:', id);
 
         // Try using a transaction for better reliability
+        if (!dbPool) throw new Error("Database pool is not available");
         const client = await dbPool.connect();
 
         try {
