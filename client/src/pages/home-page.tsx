@@ -57,10 +57,15 @@ export default function HomePage() {
   // Move updateCurrentWorkout inside component to access firebaseUser
   async function updateCurrentWorkout(workout: CurrentWorkout) {
     if (!firebaseUser?.uid) return;
+    
+    // Get a fresh Firebase token for authentication
+    const token = await firebaseUser.getIdToken(true);
+    
     await fetch(`/api/users/${firebaseUser.uid}/current-workout`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ workout })
     });

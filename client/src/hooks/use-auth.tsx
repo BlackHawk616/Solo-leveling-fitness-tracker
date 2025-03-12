@@ -245,30 +245,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData);
           return { firebaseUser: result.user, userData };
         } else {
-          // Create a fallback user object
-          console.log('Using fallback user data after fetch failures');
-          const fallbackUser = {
-            id: result.user.uid,
-            email: result.user.email || 'unknown@example.com',
-            username: result.user.displayName || 'User',
-            level: 1,
-            exp: 0,
-            totalWorkoutSeconds: 0,
-            currentWorkout: null
-          };
-          
           // Try a direct user creation as last resort
           try {
-            console.log('Attempting direct user creation as fallback');
+            console.log('Attempting direct user creation with Firebase token');
+            const token = await result.user.getIdToken(true);
             const response = await fetch('/api/users', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
               },
               body: JSON.stringify({
                 id: result.user.uid,
                 email: result.user.email || 'unknown@example.com',
-                username: result.user.displayName || 'User',
+                username: result.user.displayName || result.user.email?.split('@')[0] || 'User',
+                photoURL: result.user.photoURL
               })
             });
             
@@ -279,19 +270,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return { firebaseUser: result.user, userData: createdUser };
             } else {
               console.error('Direct user creation failed:', await response.text());
+              // Display an appropriate error message
+              toast({
+                variant: "destructive",
+                title: "Authentication Error",
+                description: "Failed to retrieve or create user data. Please try again.",
+              });
+              throw new Error('Failed to create user after multiple attempts');
             }
           } catch (createErr) {
-            console.error('Error in direct user creation:', createErr);
+            console.error('Error in user creation:', createErr);
+            toast({
+              variant: "destructive",
+              title: "Authentication Error",
+              description: "Failed to create user profile. Please try again or contact support.",
+            });
+            throw createErr;
           }
-          
-          // Fall back to client-side user if all attempts fail
-          setUser(fallbackUser);
-          toast({
-            variant: "warning",
-            title: "Partial login successful",
-            description: "You're logged in but we couldn't fully sync your profile. Some features may be limited.",
-          });
-          return { firebaseUser: result.user, userData: fallbackUser };
         }
       } catch (err) {
         console.error('Google sign-in error:', err);

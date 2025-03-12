@@ -87,7 +87,7 @@ export const pool = {
   query: async (text: string, params?: any[]) => {
     const p = await getPool();
     if (!p) throw new Error("Failed to get pool");
-    return p.query(text, params);
+    return p.query(text, params || []);
   },
   end: async () => {
     if (_pool) {
