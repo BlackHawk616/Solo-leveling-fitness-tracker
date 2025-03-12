@@ -155,13 +155,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = await fetchUserData(result.user);
           console.log('User data fetched successfully');
           setUser(userData);
-          return result.user;
+          return { firebaseUser: result.user, userData };
         } catch (fetchErr) {
           console.error('Error fetching user data after successful Google login:', fetchErr);
-          // Don't fail the sign-in if fetching user data fails
-          // Just return the Firebase user and let the app handle the missing data
-          setUser(null);
-          throw new Error('Authentication successful, but failed to retrieve user data from database. Please try again or contact support.');
+          // Still set the Firebase user even if DB fetch fails
+          setFirebaseUser(result.user);
+          // Don't throw error here to allow login to continue
+          setUser({
+            id: result.user.uid,
+            email: result.user.email,
+            username: result.user.displayName || 'User',
+            level: 1,
+            exp: 0,
+            totalWorkoutSeconds: 0,
+            currentWorkout: null
+          });
+          toast({
+            variant: "warning",
+            title: "Partial login successful",
+            description: "You're logged in but we couldn't retrieve your profile data. Some features may be limited.",
+          });
+          return { firebaseUser: result.user, userData: null };
         }
       } catch (err) {
         console.error('Google sign-in error:', err);

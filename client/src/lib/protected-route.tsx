@@ -14,6 +14,17 @@ export function ProtectedRoute({
   const { user, firebaseUser, isLoading } = useAuth();
   const [redirecting, setRedirecting] = useState(false);
 
+  // Handle redirection logic outside of render
+  useEffect(() => {
+    if (!isLoading && !user && !firebaseUser && !redirecting) {
+      console.log("Protected route: No user found, redirecting to auth");
+      setRedirecting(true);
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 100);
+    }
+  }, [user, firebaseUser, isLoading, redirecting]);
+
   return (
     <Route
       {...rest}
@@ -27,14 +38,7 @@ export function ProtectedRoute({
           );
         }
 
-        if (!user && !firebaseUser && !redirecting) {
-          console.log("Protected route: No user found, redirecting to auth");
-          // Prevent multiple redirects
-          setRedirecting(true);
-          // Use a timeout to give auth time to resolve
-          setTimeout(() => {
-            window.location.href = '/auth';
-          }, 100);
+        if (!user && !firebaseUser) {
           return <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2">Redirecting to login...</span>

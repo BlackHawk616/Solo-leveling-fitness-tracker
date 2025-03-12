@@ -16,9 +16,12 @@ export default function AuthPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      await googleLoginMutation.mutateAsync();
-      // After successful login, explicitly redirect
-      window.location.href = '/';
+      const result = await googleLoginMutation.mutateAsync();
+      console.log("Login successful:", result);
+      // Use a slight delay to ensure state is updated before redirect
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     } catch (error) {
       console.error("Login failed:", error);
     }
