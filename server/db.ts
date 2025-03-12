@@ -21,7 +21,22 @@ if (!DATABASE_URL) {
   );
 }
 
-// Create connection config from MySQL URL
+// Create connection config with appropriate SSL settings
+let config = {
+  uri: DATABASE_URL,
+};
+
+// Add SSL configuration for Vercel environment
+if (process.env.VERCEL === '1') {
+  console.log('🔒 Adding SSL configuration for Vercel environment');
+  config = {
+    uri: DATABASE_URL,
+    // Use explicit SSL config for TiDB on Vercel
+    ssl: {
+      rejectUnauthorized: true,
+    }
+  };
+} URL
 const parseDbUrl = (url: string) => {
   try {
     console.log('Parsing database URL, starts with:', url.substring(0, 15));
@@ -66,22 +81,39 @@ const createConnection = async (retries = 5): Promise<mysql.Pool> => {
     const connectionConfig = parseDbUrl(DATABASE_URL);
 
     // Create connection pool with TiDB-specific settings
-    const pool = mysql.createPool({
+    const poolConfig = {
       host: connectionConfig.host,
       port: connectionConfig.port,
       user: connectionConfig.user,
       password: connectionConfig.password,
       database: connectionConfig.database,
       waitForConnections: true,
-      connectionLimit: isVercel ? 1 : 5, // Lower connection limit for serverless
-      maxIdle: isVercel ? 1 : 5,
-      idleTimeout: 30000, // 30 seconds
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000,
-      ssl: {}, // Enable SSL for TiDB Cloud
       connectTimeout: 10000, // 10 seconds
-      timezone: '+00:00' // UTC timezone
-    });
+      timezone: '+00:00', // UTC timezone
+      ssl: {} // Enable SSL for TiDB Cloud
+    };
+
+    // Add Vercel-specific configurations
+    if (isVercel) {
+      console.log('⚠️ Using Vercel-optimized connection settings');
+      Object.assign(poolConfig, {
+        connectionLimit: 1,
+        maxIdle: 1,
+        idleTimeout: 60000, // 60 seconds in serverless
+        enableKeepAlive: false, // Disable keepalive for serverless
+        acquireTimeout: 30000 // 30 second timeout on connection acquisition
+      });
+    } else {
+      Object.assign(poolConfig, {
+        connectionLimit: 5,
+        maxIdle: 5, 
+        idleTimeout: 30000, // 30 seconds
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000
+      });
+    }
+    
+    const pool = mysql.createPool(poolConfig);
 
     // Verify connection works with a simple query
     const connection = await pool.getConnection();
