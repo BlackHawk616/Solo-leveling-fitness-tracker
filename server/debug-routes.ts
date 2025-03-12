@@ -1,26 +1,63 @@
-
 import { Express } from "express";
 import { ranks, getRankForLevel, calculateExpForLevel } from "../shared/schema.js";
-import path from "path";
-import fs from "fs";
 
 export function registerDebugRoutes(app: Express) {
+  // Debug endpoint to test database connection
+  app.get('/api/debug/database', async (req, res) => {
+    try {
+      const { getPool } = await import('./db.js');
+      const pool = await getPool();
+      let client;
+
+      try {
+        console.log('Attempting to connect to database...');
+        client = await pool.connect();
+        const [result] = await client.query('SELECT 1 as test');
+
+        res.json({
+          success: true,
+          environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+          message: 'Database connection successful',
+          result: result
+        });
+      } catch (err) {
+        console.error('Database query error:', err);
+        res.status(500).json({
+          success: false,
+          environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+          error: err instanceof Error ? err.message : String(err),
+          message: 'Database connection test failed'
+        });
+      } finally {
+        if (client) client.release();
+      }
+    } catch (err) {
+      console.error('Failed to import or initialize database:', err);
+      res.status(500).json({
+        success: false,
+        environment: process.env.VERCEL === '1' ? 'Vercel' : 'Other',
+        error: err instanceof Error ? err.message : String(err),
+        message: 'Failed to initialize database connection'
+      });
+    }
+  });
+
   // Debug endpoint to verify all levels and ranks
   app.get('/api/debug/levels', (req, res) => {
     const levels = [];
-    
+
     // Generate sample levels covering all ranks
     const testLevels = [
       1, 10, 20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 
       200, 250, 300, 350, 400, 450, 500, 575, 650, 725, 800, 
       1000, 1500, 2000
     ];
-    
+
     // Calculate information for each level
     for (const level of testLevels) {
       const rank = getRankForLevel(level);
       const expForNextLevel = calculateExpForLevel(level);
-      
+
       levels.push({
         level,
         rank: rank.name,
@@ -29,41 +66,41 @@ export function registerDebugRoutes(app: Express) {
         maxLevel: rank.maxLevel === Infinity ? "Infinity" : rank.maxLevel
       });
     }
-    
+
     res.json({
       levels,
       allRanks: ranks
     });
   });
-  
+
   // Profile simulator - view how profile will look at different levels
   app.get('/debug/profile-simulator', (req, res) => {
     const level = parseInt(req.query.level as string) || 1;
     const exp = parseInt(req.query.exp as string) || 0;
     const totalWorkoutSeconds = parseInt(req.query.seconds as string) || 3600; // Default 1 hour
-    
+
     const rank = getRankForLevel(level);
     const expForNextLevel = calculateExpForLevel(level);
     const expProgress = ((exp / expForNextLevel) * 100).toFixed(1);
-    
+
     // Format total workout time
     const formatDuration = (seconds) => {
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
       const remainingSeconds = seconds % 60;
-      
+
       let result = '';
       if (hours > 0) result += `${hours}h `;
       if (minutes > 0 || hours > 0) result += `${minutes}m `;
       result += `${remainingSeconds}s`;
-      
+
       return result.trim();
     };
-    
+
     // Read HTML template
     const templatePath = path.join(process.cwd(), 'server', 'debug-template.html');
     let template = '';
-    
+
     try {
       if (fs.existsSync(templatePath)) {
         template = fs.readFileSync(templatePath, 'utf8');
@@ -210,7 +247,7 @@ export function registerDebugRoutes(app: Express) {
 </head>
 <body>
   <h1>Profile Simulator</h1>
-  
+
   <div class="simulator-controls">
     <form method="get">
       <div class="form-group">
@@ -228,7 +265,7 @@ export function registerDebugRoutes(app: Express) {
       <button type="submit">Update Simulation</button>
     </form>
   </div>
-  
+
   <div class="card">
     <div class="profile-header">
       <div class="rank-icon" style="background-color: {{rankColor}}">{{rankIcon}}</div>
@@ -237,7 +274,7 @@ export function registerDebugRoutes(app: Express) {
         <div class="rank-name" style="color: {{rankColor}}">Level {{level}} • {{rankName}}</div>
       </div>
     </div>
-    
+
     <div>
       <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
         <span>EXP Progress</span>
@@ -247,7 +284,7 @@ export function registerDebugRoutes(app: Express) {
         <div class="progress-bar" style="width: {{expProgress}}%"></div>
       </div>
     </div>
-    
+
     <div class="stats-grid">
       <div class="stat-box">
         <div>Current Rank</div>
@@ -259,7 +296,7 @@ export function registerDebugRoutes(app: Express) {
       </div>
     </div>
   </div>
-  
+
   <h2>All Available Ranks</h2>
   <div class="ranks-list">
     {{ranksList}}
@@ -272,7 +309,7 @@ export function registerDebugRoutes(app: Express) {
       console.error('Error reading template:', error);
       template = '<html><body><h1>Error loading simulator template</h1></body></html>';
     }
-    
+
     // Get rank color based on rank name
     const getRankColor = (rankName) => {
       const colors = {
@@ -292,7 +329,7 @@ export function registerDebugRoutes(app: Express) {
       };
       return colors[rankName] || '#9166ff';
     };
-    
+
     // Generate ranks list HTML
     let ranksListHtml = '';
     ranks.forEach(r => {
@@ -308,7 +345,7 @@ export function registerDebugRoutes(app: Express) {
         </div>
       `;
     });
-    
+
     // Replace template variables
     const rankColor = getRankColor(rank.name);
     const html = template
@@ -322,7 +359,7 @@ export function registerDebugRoutes(app: Express) {
       .replace(/{{expProgress}}/g, expProgress)
       .replace(/{{totalWorkoutTime}}/g, formatDuration(totalWorkoutSeconds))
       .replace(/{{ranksList}}/g, ranksListHtml);
-    
+
     res.send(html);
   });
 }
