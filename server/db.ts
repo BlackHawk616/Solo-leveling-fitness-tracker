@@ -34,9 +34,15 @@ if (process.env.VERCEL === '1') {
     // Use explicit SSL config for TiDB on Vercel
     ssl: {
       rejectUnauthorized: true,
+      minVersion: 'TLSv1.2',
     }
   };
-} URL
+  
+  // Log more details about the environment in Vercel
+  console.log('Vercel region:', process.env.VERCEL_REGION || 'unknown');
+  console.log('Node.js version:', process.version);
+};
+
 const parseDbUrl = (url: string) => {
   try {
     console.log('Parsing database URL, starts with:', url.substring(0, 15));
@@ -88,9 +94,13 @@ const createConnection = async (retries = 5): Promise<mysql.Pool> => {
       password: connectionConfig.password,
       database: connectionConfig.database,
       waitForConnections: true,
-      connectTimeout: 10000, // 10 seconds
+      connectTimeout: 15000, // 15 seconds
       timezone: '+00:00', // UTC timezone
-      ssl: {} // Enable SSL for TiDB Cloud
+      ssl: {
+        // Always enable SSL for TiDB Cloud
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2',
+      }
     };
 
     // Add Vercel-specific configurations
