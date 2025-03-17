@@ -102,32 +102,222 @@ jobs:
         run: |
           echo "Fixing Android build configuration..."
           
-          # Fix main build.gradle
+          # Fix main build.gradle (root)
           if [ -f "android/build.gradle" ]; then
-            sed -i 's/com.android.tools.build:gradle:7.0.4/com.android.tools.build:gradle:7.4.2/g' android/build.gradle || echo "Could not update gradle version"
+            echo "Updating main build.gradle..."
+            
+            # Create backup of original file
+            cp android/build.gradle android/build.gradle.backup
+            
+            # Check if the buildscript block exists and has classpath
+            if grep -q "classpath" android/build.gradle; then
+              # Update the Android Gradle plugin version
+              sed -i 's/com.android.tools.build:gradle:[0-9.]\+/com.android.tools.build:gradle:7.4.2/g' android/build.gradle
+              echo "Updated existing Android Gradle plugin version"
+            else
+              # If no buildscript block or it's malformed, rewrite it
+              echo "Creating correct buildscript configuration..."
+              cat > android/build.gradle << EOL
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+apply from: "variables.gradle"
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+EOL
+              echo "Rewrote main build.gradle with proper configuration"
+            fi
+          else
+            echo "Main build.gradle not found, creating it..."
+            mkdir -p android
+            cat > android/build.gradle << EOL
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+apply from: "variables.gradle"
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+EOL
+            echo "Created new main build.gradle with proper configuration"
+          fi
+          
+          # Create variables.gradle if it doesn't exist
+          if [ ! -f "android/variables.gradle" ]; then
+            echo "Creating variables.gradle..."
+            cat > android/variables.gradle << EOL
+ext {
+    minSdkVersion = 22
+    compileSdkVersion = 33
+    targetSdkVersion = 33
+    androidxActivityVersion = '1.4.0'
+    androidxAppCompatVersion = '1.4.2'
+    androidxCoordinatorLayoutVersion = '1.2.0'
+    androidxCoreVersion = '1.8.0'
+    androidxFragmentVersion = '1.4.1'
+    junitVersion = '4.13.2'
+    androidxJunitVersion = '1.1.3'
+    androidxEspressoCoreVersion = '3.4.0'
+    cordovaAndroidVersion = '10.1.1'
+}
+EOL
+            echo "Created variables.gradle with default values"
           fi
           
           # Configure app/build.gradle
           if [ -f "android/app/build.gradle" ]; then
+            echo "Updating app/build.gradle..."
+            
+            # Create backup
+            cp android/app/build.gradle android/app/build.gradle.backup
+            
+            # Check if the 'apply plugin' line is present
+            if ! grep -q "apply plugin: 'com.android.application'" android/app/build.gradle; then
+              echo "Adding missing Android application plugin..."
+              echo "apply plugin: 'com.android.application'" > android/app/build.gradle.new
+              cat android/app/build.gradle >> android/app/build.gradle.new
+              mv android/app/build.gradle.new android/app/build.gradle
+            fi
+            
             # Check if compileOptions already exists
             if ! grep -q "compileOptions {" android/app/build.gradle; then
-              echo "
-          android {
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              lintOptions {
-                  abortOnError false
-              }
-          }" >> android/app/build.gradle
+              echo "Adding Java 17 compatibility options..."
+              if grep -q "android {" android/app/build.gradle; then
+                # Add inside existing android block
+                sed -i '/android {/a \    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    lintOptions {\n        abortOnError false\n    }' android/app/build.gradle
+              else
+                # Add complete android block
+                echo "
+android {
+    namespace 'com.solofitness.app'
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId 'com.solofitness.app'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName '1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lintOptions {
+        abortOnError false
+    }
+}" >> android/app/build.gradle
+              fi
             fi
+            
+            # Add necessary dependencies if they're missing
+            if ! grep -q "implementation project(':capacitor-android')" android/app/build.gradle; then
+              echo "Adding missing dependencies..."
+              echo "
+dependencies {
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}" >> android/app/build.gradle
+            fi
+          else
+            echo "app/build.gradle not found, creating it..."
+            mkdir -p android/app
+            cat > android/app/build.gradle << EOL
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.solofitness.app'
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId 'com.solofitness.app'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName '1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lintOptions {
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+EOL
+            echo "Created new app/build.gradle with proper configuration"
           fi
           
-          # Make sure to use correct dependency versions
-          if [ -f "android/app/build.gradle" ]; then
-            cat android/app/build.gradle
-          fi
+          # Display the updated files for debugging
+          echo "Contents of android/build.gradle:"
+          cat android/build.gradle
+          
+          echo "Contents of android/app/build.gradle:"
+          cat android/app/build.gradle
 
       - name: Configure Gradle properties
         run: |
