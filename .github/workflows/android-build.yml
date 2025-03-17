@@ -81,9 +81,22 @@ jobs:
       - name: Initialize Capacitor
         run: |
           echo "Initializing Capacitor..."
-          npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public || echo "Cap init already done"
-          npx cap add android
-          echo "Capacitor initialized with Android platform"
+          # Check if capacitor.config.json exists, if not create it
+          if [ ! -f "capacitor.config.json" ]; then
+            npx cap init "Solo Leveling Fitness" com.solofitness.app --web-dir=dist/public || echo "Cap init already done"
+          else
+            echo "Capacitor already initialized, skipping init step"
+          fi
+          
+          # Check if android platform exists before adding it
+          if [ ! -d "android" ]; then
+            echo "Adding Android platform..."
+            npx cap add android
+          else
+            echo "Android platform already exists, skipping add step"
+          fi
+          
+          echo "Capacitor setup completed"
 
       - name: Fix Android Build Configuration
         run: |
